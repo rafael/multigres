@@ -80,20 +80,6 @@ func MultiPoolerIDString(id *clustermetadatapb.ID) string {
 	return fmt.Sprintf("%s-%d", id.Cell, id.Uid)
 }
 
-// ParseMultiPoolerID parses a string representation of a MultiPooler ID
-func ParseMultiPoolerID(idStr string) (*clustermetadatapb.ID, error) {
-	var cell string
-	var uid uint32
-	n, err := fmt.Sscanf(idStr, "%s-%d", &cell, &uid)
-	if err != nil || n != 2 {
-		return nil, fmt.Errorf("invalid MultiPooler ID format: %s", idStr)
-	}
-	return &clustermetadatapb.ID{
-		Cell: cell,
-		Uid:  uid,
-	}, nil
-}
-
 // GetMultiPooler is a high level function to read multipooler data.
 func (ts *store) GetMultiPooler(ctx context.Context, id *clustermetadatapb.ID) (*MultiPoolerInfo, error) {
 	conn, err := ts.ConnForCell(ctx, id.Cell)
@@ -104,7 +90,7 @@ func (ts *store) GetMultiPooler(ctx context.Context, id *clustermetadatapb.ID) (
 	poolerPath := path.Join(PoolersPath, MultiPoolerIDString(id), PoolerFile)
 	data, version, err := conn.Get(ctx, poolerPath)
 	if err != nil {
-		return nil, mterrors.Wrap(err, fmt.Sprintf("unable to connect to multipooler %q", id))
+		return nil, mterrors.Wrap(err, fmt.Sprintf("unable to get multipooler %q", id))
 	}
 	multipooler := &clustermetadatapb.MultiPooler{}
 	if err := proto.Unmarshal(data, multipooler); err != nil {
@@ -128,7 +114,7 @@ func (ts *store) GetMultiPoolerIDsByCell(ctx context.Context, cell string) ([]*c
 	}
 
 	// List the directory, and parse the IDs
-	children, err := conn.ListDir(ctx, PoolersPath, false /*full*/)
+	children, err := conn.List(ctx, PoolersPath)
 	if err != nil {
 		if errors.Is(err, &TopoError{Code: NoNode}) {
 			// directory doesn't exist, empty list, no error.
@@ -139,10 +125,11 @@ func (ts *store) GetMultiPoolerIDsByCell(ctx context.Context, cell string) ([]*c
 
 	result := make([]*clustermetadatapb.ID, len(children))
 	for i, child := range children {
-		result[i], err = ParseMultiPoolerID(child.Name)
-		if err != nil {
+		multipooler := &clustermetadatapb.MultiPooler{}
+		if err := proto.Unmarshal(child.Value, multipooler); err != nil {
 			return nil, err
 		}
+		result[i] = multipooler.Id
 	}
 	return result, nil
 }
@@ -309,21 +296,4 @@ func (ts *store) InitMultiPooler(ctx context.Context, mtpooler *clustermetadatap
 		return nil
 	}
 	return err
-}
-
-// ValidateMultiPooler makes sure a multipooler is represented correctly in the topology server.
-func (ts *store) ValidateMultiPooler(ctx context.Context, id *clustermetadatapb.ID) error {
-	// read the mtpooler record, make sure it parses
-	mtpooler, err := ts.GetMultiPooler(ctx, id)
-	if err != nil {
-		return err
-	}
-	if mtpooler.Id.Cell != id.Cell || mtpooler.Id.Uid != id.Uid {
-		return fmt.Errorf("bad mtpooler id data for mtpooler %v: %#v", MultiPoolerIDString(id), mtpooler.Id)
-	}
-
-	// TODO: Add validation for shard replication nodes
-	// This would require implementing shard replication management first
-
-	return nil
 }

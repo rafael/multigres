@@ -158,7 +158,6 @@ type CellStore interface {
 	UpdateMultiPoolerFields(ctx context.Context, id *clustermetadatapb.ID, update func(*clustermetadatapb.MultiPooler) error) (*clustermetadatapb.MultiPooler, error)
 	DeleteMultiPooler(ctx context.Context, id *clustermetadatapb.ID) error
 	InitMultiPooler(ctx context.Context, multipooler *clustermetadatapb.MultiPooler, allowPrimaryOverride, allowUpdate bool) error
-	ValidateMultiPooler(ctx context.Context, id *clustermetadatapb.ID) error
 }
 
 // Store is the full topology API that combines both global and cell operations.
