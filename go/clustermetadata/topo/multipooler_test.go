@@ -94,12 +94,6 @@ func checkMultiPoolerInfosEqual(t *testing.T, expected, actual []*topo.MultiPool
 	}
 }
 
-func setupMultiPoolers(t *testing.T, ctx context.Context, ts topo.Store) {
-	for _, multipooler := range multipoolers {
-		require.NoError(t, ts.CreateMultiPooler(ctx, multipooler))
-	}
-}
-
 // Test various cases of calls to GetMultiPoolersByCell.
 // GetMultiPoolersByCell first tries to get all the multipoolers using List.
 // If the response is too large, we will get an error, and fall back to one multipooler at a time.
@@ -609,6 +603,11 @@ func TestGetMultiPoolerIDsByCell(t *testing.T) {
 					require.Equal(t, expectedIDs[i].Cell, id.Cell)
 					require.Equal(t, expectedIDs[i].Uid, id.Uid)
 				}
+
+				// Verify cell boundary: multipoolers are NOT accessible from cell2
+				cell2Ids, err := ts.GetMultiPoolerIDsByCell(ctx, cell2)
+				require.NoError(t, err)
+				require.Empty(t, cell2Ids, "multipoolers should not be accessible from other cells")
 			},
 		},
 		{
@@ -995,8 +994,8 @@ func TestGetMultiPoolersByCell_Comprehensive(t *testing.T) {
 	defer cancel()
 
 	t.Run("cell with multiple multipoolers without filtering", func(t *testing.T) {
-		// Create fresh topo for this test
-		ts, _ := memorytopo.NewServerAndFactory(ctx, "zone1")
+		// Create fresh topo for this test with multiple cells
+		ts, _ := memorytopo.NewServerAndFactory(ctx, "zone1", "zone2")
 		defer ts.Close()
 
 		// Setup: Create 4 multipoolers in zone1 (2 databases × 2 shards)
@@ -1057,11 +1056,16 @@ func TestGetMultiPoolersByCell_Comprehensive(t *testing.T) {
 			{MultiPooler: multipoolers[3]}, // db2, 8-
 		}
 		checkMultiPoolerInfosEqual(t, expectedMPs, multipoolerInfos)
+
+		// Verify cell boundary: multipoolers are NOT accessible from other cells
+		otherCellInfos, err := ts.GetMultiPoolersByCell(ctx, "zone2", nil)
+		require.NoError(t, err)
+		require.Empty(t, otherCellInfos, "multipoolers should not be accessible from other cells")
 	})
 
 	t.Run("cell with database filtering", func(t *testing.T) {
-		// Create fresh topo for this test
-		ts, _ := memorytopo.NewServerAndFactory(ctx, "zone1")
+		// Create fresh topo for this test with multiple cells
+		ts, _ := memorytopo.NewServerAndFactory(ctx, "zone1", "zone2")
 		defer ts.Close()
 
 		// Setup: Create 2 multipoolers for db1 in zone1
@@ -1107,11 +1111,16 @@ func TestGetMultiPoolersByCell_Comprehensive(t *testing.T) {
 		for _, info := range multipoolerInfos {
 			require.Equal(t, "db1", info.Database)
 		}
+
+		// Verify cell boundary: multipoolers are NOT accessible from other cells
+		otherCellInfos, err := ts.GetMultiPoolersByCell(ctx, "zone2", nil)
+		require.NoError(t, err)
+		require.Empty(t, otherCellInfos, "multipoolers should not be accessible from other cells")
 	})
 
 	t.Run("cell with database and shard filtering", func(t *testing.T) {
-		// Create fresh topo for this test
-		ts, _ := memorytopo.NewServerAndFactory(ctx, "zone1")
+		// Create fresh topo for this test with multiple cells
+		ts, _ := memorytopo.NewServerAndFactory(ctx, "zone1", "zone2")
 		defer ts.Close()
 
 		// Setup: Create 2 multipoolers for db2 in zone1
@@ -1156,6 +1165,11 @@ func TestGetMultiPoolersByCell_Comprehensive(t *testing.T) {
 		// Verify correct multipooler is returned
 		require.Equal(t, "db2", multipoolerInfos[0].Database)
 		require.Equal(t, "-8", multipoolerInfos[0].Shard)
+
+		// Verify cell boundary: multipoolers are NOT accessible from other cells
+		otherCellInfos, err := ts.GetMultiPoolersByCell(ctx, "zone2", nil)
+		require.NoError(t, err)
+		require.Empty(t, otherCellInfos, "multipoolers should not be accessible from other cells")
 	})
 
 	t.Run("empty cell returns empty list", func(t *testing.T) {
@@ -1182,5 +1196,58 @@ func TestGetMultiPoolersByCell_Comprehensive(t *testing.T) {
 		_, err := ts.GetMultiPoolersByCell(ctx, "nonexistent", nil)
 		require.Error(t, err)
 		require.True(t, errors.Is(err, &topo.TopoError{Code: topo.NoNode}))
+	})
+
+	t.Run("multipoolers are isolated between cells", func(t *testing.T) {
+		// Create fresh topo for this test with multiple cells
+		ts, _ := memorytopo.NewServerAndFactory(ctx, "zone1", "zone2")
+		defer ts.Close()
+
+		// Setup: Create multipoolers in both cells
+		zone1Multipooler := &clustermetadatapb.MultiPooler{
+			Id:            &clustermetadatapb.ID{Cell: "zone1", Uid: 1},
+			Database:      "db1",
+			Shard:         "-8",
+			Hostname:      "host1",
+			PortMap:       map[string]int32{"grpc": 8080},
+			Type:          clustermetadatapb.PoolerType_PRIMARY,
+			ServingStatus: clustermetadatapb.PoolerServingStatus_SERVING,
+		}
+		zone2Multipooler := &clustermetadatapb.MultiPooler{
+			Id:            &clustermetadatapb.ID{Cell: "zone2", Uid: 1},
+			Database:      "db1",
+			Shard:         "-8",
+			Hostname:      "host2",
+			PortMap:       map[string]int32{"grpc": 8081},
+			Type:          clustermetadatapb.PoolerType_REPLICA,
+			ServingStatus: clustermetadatapb.PoolerServingStatus_SERVING,
+		}
+
+		// Create multipoolers in their respective cells
+		require.NoError(t, ts.CreateMultiPooler(ctx, zone1Multipooler))
+		require.NoError(t, ts.CreateMultiPooler(ctx, zone2Multipooler))
+
+		// Test: Verify zone1 can only see its own multipooler
+		zone1Infos, err := ts.GetMultiPoolersByCell(ctx, "zone1", nil)
+		require.NoError(t, err)
+		require.Len(t, zone1Infos, 1)
+		require.Equal(t, "zone1", zone1Infos[0].Id.Cell)
+		require.Equal(t, "host1", zone1Infos[0].Hostname)
+
+		// Test: Verify zone2 can only see its own multipooler
+		zone2Infos, err := ts.GetMultiPoolersByCell(ctx, "zone2", nil)
+		require.NoError(t, err)
+		require.Len(t, zone2Infos, 1)
+		require.Equal(t, "zone2", zone2Infos[0].Id.Cell)
+		require.Equal(t, "host2", zone2Infos[0].Hostname)
+
+		// Test: Verify cross-cell access is properly isolated
+		zone1FromZone2, err := ts.GetMultiPooler(ctx, zone1Multipooler.Id)
+		require.NoError(t, err, "should be able to get multipooler by ID regardless of current cell context")
+		require.Equal(t, "zone1", zone1FromZone2.Id.Cell)
+
+		zone2FromZone1, err := ts.GetMultiPooler(ctx, zone2Multipooler.Id)
+		require.NoError(t, err, "should be able to get multipooler by ID regardless of current cell context")
+		require.Equal(t, "zone2", zone2FromZone1.Id.Cell)
 	})
 }
