@@ -132,25 +132,6 @@ message MultiOrch {
   map<string, int32> port_map = 3;
 }
 
-// =============================================================================
-// Auxiliary Data Types
-// =============================================================================
-
-// ComponentType represents the type of Multigres component
-enum ComponentType {
-  // UNKNOWN represents an unknown or uninitialized component type
-  UNKNOWN = 0;
-  
-  // MULTIPOOLER represents a multipooler component
-  MULTIPOOLER = 1;
-  
-  // MULTIGATEWAY represents a multigateway component
-  MULTIGATEWAY = 2;
-  
-  // MULTIORCH represents a multiorch component
-  MULTIORCH = 3;
-}
-
 // ID is a globally unique pooler identifier.
 message ID {
   // component identifies the type of Multigres component (multipooler, multigateway, or multiorch)
@@ -161,7 +142,26 @@ message ID {
 
   // uid is a unique identifier for the component within the multigres
   // cluster. 
-  string uid = 3;
+  string name = 3;
+
+  // =============================================================================
+  // Auxiliary Data Types
+  // =============================================================================
+
+  // ComponentType represents the type of Multigres component
+  enum ComponentType {
+    // UNKNOWN represents an unknown or uninitialized component type
+    UNKNOWN = 0;
+
+    // MULTIPOOLER represents a multipooler component
+    MULTIPOOLER = 1;
+
+    // MULTIGATEWAY represents a multigateway component
+    MULTIGATEWAY = 2;
+
+    // MULTIORCH represents a multiorch component
+    MULTIORCH = 3;
+  }
 }
 
 // KeyRange represents a range of keys for sharding

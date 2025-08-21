@@ -158,6 +158,7 @@ func (PoolerServingStatus) EnumDescriptor() ([]byte, []int) {
 	return file_clustermetadata_proto_rawDescGZIP(), []int{1}
 }
 
+// ComponentType represents the type of Multigres component
 type ID_ComponentType int32
 
 const (
@@ -679,7 +680,7 @@ type ID struct {
 	Cell string `protobuf:"bytes,2,opt,name=cell,proto3" json:"cell,omitempty"`
 	// uid is a unique identifier for the component within the multigres
 	// cluster.
-	Uid           string `protobuf:"bytes,3,opt,name=uid,proto3" json:"uid,omitempty"`
+	Name          string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -728,9 +729,9 @@ func (x *ID) GetCell() string {
 	return ""
 }
 
-func (x *ID) GetUid() string {
+func (x *ID) GetName() string {
 	if x != nil {
-		return x.Uid
+		return x.Name
 	}
 	return ""
 }
@@ -835,11 +836,11 @@ const file_clustermetadata_proto_rawDesc = "" +
 	"\bport_map\x18\x03 \x03(\v2'.clustermetadata.MultiOrch.PortMapEntryR\aportMap\x1a:\n" +
 	"\fPortMapEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xbb\x01\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xbd\x01\n" +
 	"\x02ID\x12?\n" +
 	"\tcomponent\x18\x01 \x01(\x0e2!.clustermetadata.ID.ComponentTypeR\tcomponent\x12\x12\n" +
-	"\x04cell\x18\x02 \x01(\tR\x04cell\x12\x10\n" +
-	"\x03uid\x18\x03 \x01(\tR\x03uid\"N\n" +
+	"\x04cell\x18\x02 \x01(\tR\x04cell\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"N\n" +
 	"\rComponentType\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\x0f\n" +
 	"\vMULTIPOOLER\x10\x01\x12\x10\n" +
