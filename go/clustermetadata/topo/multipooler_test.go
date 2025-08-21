@@ -124,7 +124,7 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "alpha",
 					},
 					Hostname: "host1",
 					PortMap: map[string]int32{
@@ -149,7 +149,7 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "beta",
 					},
 					Hostname: "host1",
 					PortMap: map[string]int32{
@@ -164,7 +164,7 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 2),
+						Name:      "echo",
 					},
 					Hostname: "host1",
 					PortMap: map[string]int32{
@@ -179,7 +179,7 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 3),
+						Name:      "foxtrot",
 					},
 					Hostname: "host1",
 					PortMap: map[string]int32{
@@ -194,7 +194,7 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 4),
+						Name:      "golf",
 					},
 					Hostname: "host1",
 					PortMap: map[string]int32{
@@ -219,7 +219,7 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "hotel",
 					},
 					Hostname: "host1",
 					PortMap: map[string]int32{
@@ -234,7 +234,7 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 2),
+						Name:      "india",
 					},
 					Hostname: "host1",
 					PortMap: map[string]int32{
@@ -265,7 +265,7 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "juliet",
 					},
 					Hostname: "host1",
 					PortMap: map[string]int32{
@@ -280,7 +280,7 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 2),
+						Name:      "kilo",
 					},
 					Hostname: "host1",
 					PortMap: map[string]int32{
@@ -295,7 +295,7 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 3),
+						Name:      "lima",
 					},
 					Hostname: "host1",
 					PortMap: map[string]int32{
@@ -310,7 +310,7 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 4),
+						Name:      "mike",
 					},
 					Hostname: "host1",
 					PortMap: map[string]int32{
@@ -342,25 +342,22 @@ func TestServerGetMultiPoolersByCell(t *testing.T) {
 				factory.AddOperationError(memorytopo.List, ".*", tt.listError)
 			}
 
-			var uid uint32 = 1
-			for _, ds := range tt.databaseShards {
-				for i := 0; i < tt.createShardMultiPoolers; i++ {
-					multipooler := &clustermetadatapb.MultiPooler{
-						Id: &clustermetadatapb.ID{
-							Component: clustermetadatapb.ID_MULTIPOOLER,
-							Cell:      cell,
-							Name:      fmt.Sprintf("%d", uid),
-						},
-						Hostname:      "host1",
-						PortMap:       map[string]int32{"grpc": int32(uid)},
-						Database:      ds.Database,
-						Shard:         ds.Shard,
-						Type:          clustermetadatapb.PoolerType_PRIMARY,
-						ServingStatus: clustermetadatapb.PoolerServingStatus_SERVING,
-					}
-					require.NoError(t, ts.CreateMultiPooler(ctx, multipooler))
-					uid++
+			// Create multipoolers with names from expected results
+			for i, expectedMP := range tt.expectedMultiPoolers {
+				multipooler := &clustermetadatapb.MultiPooler{
+					Id: &clustermetadatapb.ID{
+						Component: clustermetadatapb.ID_MULTIPOOLER,
+						Cell:      cell,
+						Name:      expectedMP.Id.Name,
+					},
+					Hostname:      "host1",
+					PortMap:       map[string]int32{"grpc": int32(i + 1)},
+					Database:      expectedMP.Database,
+					Shard:         expectedMP.Shard,
+					Type:          expectedMP.Type,
+					ServingStatus: expectedMP.ServingStatus,
 				}
+				require.NoError(t, ts.CreateMultiPooler(ctx, multipooler))
 			}
 
 			out, err := ts.GetMultiPoolersByCell(ctx, cell, tt.opt)
@@ -431,7 +428,7 @@ func TestMultiPoolerCRUDOperations(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "november",
 					},
 					Database:      "testdb",
 					Shard:         "testshard",
@@ -465,7 +462,7 @@ func TestMultiPoolerCRUDOperations(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "oscar",
 					},
 					Database:      "testdb",
 					Shard:         "testshard",
@@ -489,7 +486,7 @@ func TestMultiPoolerCRUDOperations(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "papa",
 					},
 					Database:      "testdb",
 					Shard:         "testshard",
@@ -527,7 +524,7 @@ func TestMultiPoolerCRUDOperations(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "quebec",
 					},
 					Database:      "testdb",
 					Shard:         "testshard",
@@ -585,7 +582,7 @@ func TestGetMultiPoolerIDsByCell(t *testing.T) {
 						Id: &clustermetadatapb.ID{
 							Component: clustermetadatapb.ID_MULTIPOOLER,
 							Cell:      cell1,
-							Name:      fmt.Sprintf("%d", 1),
+							Name:      "bravo",
 						},
 						Database:      "db1",
 						Shard:         "shard1",
@@ -598,7 +595,7 @@ func TestGetMultiPoolerIDsByCell(t *testing.T) {
 						Id: &clustermetadatapb.ID{
 							Component: clustermetadatapb.ID_MULTIPOOLER,
 							Cell:      cell1,
-							Name:      fmt.Sprintf("%d", 3),
+							Name:      "charlie",
 						},
 						Database:      "db2",
 						Shard:         "shard2",
@@ -621,12 +618,12 @@ func TestGetMultiPoolerIDsByCell(t *testing.T) {
 					{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell1,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "bravo",
 					},
 					{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell1,
-						Name:      fmt.Sprintf("%d", 3),
+						Name:      "charlie",
 					},
 				}
 
@@ -679,7 +676,7 @@ func TestUpdateMultiPoolerFields(t *testing.T) {
 				id := &clustermetadatapb.ID{
 					Component: clustermetadatapb.ID_MULTIPOOLER,
 					Cell:      cell,
-					Name:      fmt.Sprintf("%d", 1),
+					Name:      "tango",
 				}
 				multipooler := &clustermetadatapb.MultiPooler{
 					Id:            id,
@@ -713,7 +710,7 @@ func TestUpdateMultiPoolerFields(t *testing.T) {
 				id := &clustermetadatapb.ID{
 					Component: clustermetadatapb.ID_MULTIPOOLER,
 					Cell:      cell,
-					Name:      fmt.Sprintf("%d", 1),
+					Name:      "uniform",
 				}
 				multipooler := &clustermetadatapb.MultiPooler{
 					Id:            id,
@@ -744,7 +741,7 @@ func TestUpdateMultiPoolerFields(t *testing.T) {
 				id := &clustermetadatapb.ID{
 					Component: clustermetadatapb.ID_MULTIPOOLER,
 					Cell:      cell,
-					Name:      fmt.Sprintf("%d", 1),
+					Name:      "victor",
 				}
 				multipooler := &clustermetadatapb.MultiPooler{
 					Id:            id,
@@ -773,7 +770,7 @@ func TestUpdateMultiPoolerFields(t *testing.T) {
 				id := &clustermetadatapb.ID{
 					Component: clustermetadatapb.ID_MULTIPOOLER,
 					Cell:      cell,
-					Name:      fmt.Sprintf("%d", 1),
+					Name:      "whiskey",
 				}
 				multipooler := &clustermetadatapb.MultiPooler{
 					Id:            id,
@@ -832,7 +829,7 @@ func TestInitMultiPooler(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "zulu",
 					},
 					Database:      "testdb",
 					Shard:         "testshard",
@@ -857,7 +854,7 @@ func TestInitMultiPooler(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "xray",
 					},
 					Database:      "testdb",
 					Shard:         "testshard",
@@ -872,7 +869,7 @@ func TestInitMultiPooler(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "xray",
 					},
 					Database:      "testdb",
 					Shard:         "testshard",
@@ -897,7 +894,7 @@ func TestInitMultiPooler(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "whiskey",
 					},
 					Database:      "testdb",
 					Shard:         "testshard",
@@ -912,7 +909,7 @@ func TestInitMultiPooler(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "whiskey",
 					},
 					Database:      "testdb",
 					Shard:         "testshard",
@@ -934,7 +931,7 @@ func TestInitMultiPooler(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "whiskey",
 					},
 					Database:      "testdb",
 					Shard:         "testshard",
@@ -949,7 +946,7 @@ func TestInitMultiPooler(t *testing.T) {
 					Id: &clustermetadatapb.ID{
 						Component: clustermetadatapb.ID_MULTIPOOLER,
 						Cell:      cell,
-						Name:      fmt.Sprintf("%d", 1),
+						Name:      "whiskey",
 					},
 					Database:      "differentdb",
 					Shard:         "testshard",
