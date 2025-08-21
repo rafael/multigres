@@ -28,11 +28,12 @@ import (
 )
 
 // NewMultiPooler creates a new MultiPooler record with the given id, cell, and hostname.
-func NewMultiPooler(uid uint32, cell, host string) *clustermetadatapb.MultiPooler {
+func NewMultiPooler(uid string, cell, host string) *clustermetadatapb.MultiPooler {
 	return &clustermetadatapb.MultiPooler{
 		Id: &clustermetadatapb.ID{
-			Cell: cell,
-			Uid:  uid,
+			Component: clustermetadatapb.ID_MULTIPOOLER,
+			Cell:      cell,
+			Uid:       uid,
 		},
 		Hostname: host,
 		PortMap:  make(map[string]int32),
@@ -77,7 +78,7 @@ func NewMultiPoolerInfo(multipooler *clustermetadatapb.MultiPooler, version Vers
 
 // MultiPoolerIDString returns the string representation of a MultiPooler ID
 func MultiPoolerIDString(id *clustermetadatapb.ID) string {
-	return fmt.Sprintf("%s-%d", id.Cell, id.Uid)
+	return fmt.Sprintf("%s-%s-%s", ComponentTypeToString(id.Component), id.Cell, id.Uid)
 }
 
 // GetMultiPooler is a high level function to read multipooler data.
