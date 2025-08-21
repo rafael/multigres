@@ -1009,6 +1009,30 @@ func TestNewMultiPooler(t *testing.T) {
 			require.NotNil(t, result.PortMap)
 		})
 	}
+
+	// Test random name generation when name is empty
+	t.Run("empty name generates random name", func(t *testing.T) {
+		result := topo.NewMultiPooler("", "zone2", "host2.example.com")
+
+		// Verify basic properties
+		require.Equal(t, "zone2", result.Id.Cell)
+		require.Equal(t, "host2.example.com", result.Hostname)
+		require.NotNil(t, result.PortMap)
+
+		// Verify random name was generated
+		require.NotEmpty(t, result.Id.Name, "expected random name to be generated for empty name")
+		require.Len(t, result.Id.Name, 8, "expected random name to be 8 characters long")
+
+		// Verify the generated name only contains valid characters
+		validChars := "bcdfghjklmnpqrstvwxz2456789"
+		for _, char := range result.Id.Name {
+			require.Contains(t, validChars, string(char), "generated name should only contain valid characters")
+		}
+
+		// Test that multiple calls generate different names
+		result2 := topo.NewMultiPooler("", "zone2", "host2.example.com")
+		require.NotEqual(t, result.Id.Name, result2.Id.Name, "multiple calls should generate different random names")
+	})
 }
 
 // TestMultiPoolerInfo tests the MultiPoolerInfo methods

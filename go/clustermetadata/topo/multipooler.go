@@ -28,7 +28,11 @@ import (
 )
 
 // NewMultiPooler creates a new MultiPooler record with the given name, cell, and hostname.
+// If name is empty, a random name will be generated.
 func NewMultiPooler(name string, cell, host string) *clustermetadatapb.MultiPooler {
+	if name == "" {
+		name = RandomString(8)
+	}
 	return &clustermetadatapb.MultiPooler{
 		Id: &clustermetadatapb.ID{
 			Component: clustermetadatapb.ID_MULTIPOOLER,
