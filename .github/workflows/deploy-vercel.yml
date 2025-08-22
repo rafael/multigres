@@ -14,10 +14,6 @@
 
 name: Deploy to Vercel
 
-env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
 on:
   push:
     branches:
@@ -75,7 +71,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '24'
         cache: 'pnpm'
         cache-dependency-path: 'site/pnpm-lock.yaml'
 
@@ -87,14 +83,23 @@ jobs:
       run: npm install --global vercel@44.7.3
 
     - name: Pull Vercel Environment Information
+      env:
+        VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: npx vercel@44.7.3 pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
       working-directory: ./site
 
     - name: Build Project Artifacts
+      env:
+        VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: npx vercel@44.7.3 build --token ${{ secrets.VERCEL_TOKEN }}
       working-directory: ./site
 
     - name: Deploy Preview to Vercel
+      env:
+        VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: npx vercel@44.7.3 deploy --prebuilt --token ${{ secrets.VERCEL_TOKEN }}
       working-directory: ./site
 
@@ -138,7 +143,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '24'
         cache: 'pnpm'
         cache-dependency-path: 'site/pnpm-lock.yaml'
 
@@ -150,13 +155,22 @@ jobs:
       run: npm install --global vercel@44.7.3
 
     - name: Pull Vercel Environment Information
+      env:
+        VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: npx vercel@44.7.3 pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
       working-directory: ./site
 
     - name: Build Project Artifacts
+      env:
+        VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: npx vercel@44.7.3 build --prod --token ${{ secrets.VERCEL_TOKEN }}
       working-directory: ./site
 
     - name: Deploy Production to Vercel
+      env:
+        VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       run: npx vercel@44.7.3 deploy --prebuilt --prod --token ${{ secrets.VERCEL_TOKEN }}
       working-directory: ./site
