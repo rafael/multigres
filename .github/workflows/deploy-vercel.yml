@@ -31,11 +31,10 @@ on:
       - reopened
 
 jobs:
-  deploy-preview:
-    if: github.event_name == 'pull_request'
+  setup:
     runs-on: ubuntu-24.04
     environment: ci
-    
+
     steps:
     - uses: actions/checkout@v4
 
@@ -47,20 +46,20 @@ jobs:
           echo "Please configure the VERCEL_ORG_ID secret in your repository settings"
           exit 1
         fi
-        
+
         if [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
           echo "❌ VERCEL_PROJECT_ID secret is not configured"
           echo "Please configure the VERCEL_PROJECT_ID secret in your repository settings"
           exit 1
         fi
-        
+
         if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
           echo "❌ VERCEL_TOKEN secret is not configured"
           echo "Please configure the VERCEL_TOKEN secret in your repository settings"
           echo "This should be a Vercel Personal Access Token with deploy permissions"
           exit 1
         fi
-        
+
         echo "✅ All required secrets are configured"
 
     - name: Install pnpm
@@ -81,6 +80,15 @@ jobs:
 
     - name: Install Vercel CLI
       run: npm install --global vercel@44.7.3
+
+  deploy-preview:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    environment: ci
+    needs: setup
+
+    steps:
+    - uses: actions/checkout@v4
 
     - name: Pull Vercel Environment Information
       env:
@@ -107,52 +115,10 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-24.04
     environment: ci
-    
+    needs: setup
+
     steps:
     - uses: actions/checkout@v4
-
-    - name: Validate Required Secrets
-      shell: bash
-      run: |
-        if [ -z "${{ secrets.VERCEL_ORG_ID }}" ]; then
-          echo "❌ VERCEL_ORG_ID secret is not configured"
-          echo "Please configure the VERCEL_ORG_ID secret in your repository settings"
-          exit 1
-        fi
-        
-        if [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
-          echo "❌ VERCEL_PROJECT_ID secret is not configured"
-          echo "Please configure the VERCEL_PROJECT_ID secret in your repository settings"
-          exit 1
-        fi
-        
-        if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
-          echo "❌ VERCEL_TOKEN secret is not configured"
-          echo "Please configure the VERCEL_TOKEN secret in your repository settings"
-          echo "This should be a Vercel Personal Access Token with deploy permissions"
-          exit 1
-        fi
-        
-        echo "✅ All required secrets are configured"
-
-    - name: Install pnpm
-      uses: pnpm/action-setup@v3
-      with:
-        version: 9.15.5
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '24'
-        cache: 'pnpm'
-        cache-dependency-path: 'site/pnpm-lock.yaml'
-
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
-      working-directory: ./site
-
-    - name: Install Vercel CLI
-      run: npm install --global vercel@44.7.3
 
     - name: Pull Vercel Environment Information
       env:
