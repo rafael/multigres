@@ -17,6 +17,7 @@ name: Deploy to Vercel
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
 
 on:
   push:
@@ -51,9 +52,10 @@ jobs:
           exit 1
         fi
         
-        if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
-          echo "❌ VERCEL_TOKEN secret is not configured"
-          echo "Please configure the VERCEL_TOKEN secret in your repository settings"
+        if [ -z "${{ secrets.VERCEL_PROTECTION_BYPASS }}" ]; then
+          echo "❌ VERCEL_PROTECTION_BYPASS secret is not configured"
+          echo "Please configure the VERCEL_PROTECTION_BYPASS secret in your repository settings"
+          echo "This should be the value from the x-vercel-protection-bypass header"
           exit 1
         fi
         
@@ -79,15 +81,15 @@ jobs:
       run: npm install --global vercel@44.7.3
 
     - name: Pull Vercel Environment Information
-      run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+      run: vercel pull --yes --environment=preview --header "x-vercel-protection-bypass:$VERCEL_PROTECTION_BYPASS"
       working-directory: ./site
 
     - name: Build Project Artifacts
-      run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+      run: vercel build --header "x-vercel-protection-bypass:$VERCEL_PROTECTION_BYPASS"
       working-directory: ./site
 
     - name: Deploy Preview to Vercel
-      run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+      run: vercel deploy --prebuilt --header "x-vercel-protection-bypass:$VERCEL_PROTECTION_BYPASS"
       working-directory: ./site
 
   deploy-production:
@@ -111,9 +113,10 @@ jobs:
           exit 1
         fi
         
-        if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
-          echo "❌ VERCEL_TOKEN secret is not configured"
-          echo "Please configure the VERCEL_TOKEN secret in your repository settings"
+        if [ -z "${{ secrets.VERCEL_PROTECTION_BYPASS }}" ]; then
+          echo "❌ VERCEL_PROTECTION_BYPASS secret is not configured"
+          echo "Please configure the VERCEL_PROTECTION_BYPASS secret in your repository settings"
+          echo "This should be the value from the x-vercel-protection-bypass header"
           exit 1
         fi
         
@@ -139,13 +142,13 @@ jobs:
       run: npm install --global vercel@44.7.3
 
     - name: Pull Vercel Environment Information
-      run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      run: vercel pull --yes --environment=production --header "x-vercel-protection-bypass:$VERCEL_PROTECTION_BYPASS"
       working-directory: ./site
 
     - name: Build Project Artifacts
-      run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      run: vercel build --prod --header "x-vercel-protection-bypass:$VERCEL_PROTECTION_BYPASS"
       working-directory: ./site
 
     - name: Deploy Production to Vercel
-      run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+      run: vercel deploy --prebuilt --prod --header "x-vercel-protection-bypass:$VERCEL_PROTECTION_BYPASS"
       working-directory: ./site
