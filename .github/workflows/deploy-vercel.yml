@@ -20,14 +20,19 @@ env:
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
     paths:
       - 'site/**'
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
     paths:
       - 'site/**'
-    types: [ opened, synchronize, reopened ]
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 jobs:
   deploy-preview:
