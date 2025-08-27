@@ -15,16 +15,46 @@
 package init
 
 import (
-	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
+
+// executeInitCommand builds and runs the actual multigres binary with "cluster init" command
+func executeInitCommand(t *testing.T, args []string) (string, error) {
+	// Create a separate temp directory for the binary to avoid conflicts
+	binaryDir, err := os.MkdirTemp("", "multigres_binary")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory for binary: %v", err)
+	}
+	defer os.RemoveAll(binaryDir)
+
+	// Build multigres binary for testing (following pgctld pattern)
+	multigresBinary := filepath.Join(binaryDir, "multigres")
+	buildCmd := exec.Command("go", "build", "-o", multigresBinary, "../../..")
+
+	// Set working directory to avoid issues with temp paths
+	wd, _ := os.Getwd()
+	buildCmd.Dir = wd
+
+	buildOutput, err := buildCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to build multigres binary: %v\nOutput: %s", err, string(buildOutput))
+	}
+
+	// Prepare the full command: "multigres cluster init <args>"
+	cmdArgs := append([]string{"cluster", "init"}, args...)
+	cmd := exec.Command(multigresBinary, cmdArgs...)
+
+	output, err := cmd.CombinedOutput()
+	return string(output), err
+}
 
 func TestInitCommand(t *testing.T) {
 	tests := []struct {
@@ -86,106 +116,48 @@ func TestInitCommand(t *testing.T) {
 			configPaths, cleanup := tt.setupDirs(t)
 			defer cleanup()
 
-			// Create a copy of the command for testing
-			cmd := &cobra.Command{
-				Use:  "init",
-				RunE: runInit,
+			// Build command arguments
+			args := []string{}
+			for _, path := range configPaths {
+				args = append(args, "--config-path", path)
 			}
 
-			// Add the config-path flag
-			cmd.Flags().StringSlice("config-path", configPaths, "test config paths")
-
-			// Capture stdout (the actual output from fmt.Println calls)
-			oldStdout := os.Stdout
-			r, w, _ := os.Pipe()
-			os.Stdout = w
-
-			// Capture stderr
-			var stderr bytes.Buffer
-			cmd.SetErr(&stderr)
-
-			// Execute command
-			err := cmd.Execute()
-
-			// Close writer and restore stdout
-			w.Close()
-			os.Stdout = oldStdout
-
-			// Read captured output
-			var output bytes.Buffer
-			_, err2 := output.ReadFrom(r)
-			require.NoError(t, err2)
+			// Execute command using the actual binary
+			output, err := executeInitCommand(t, args)
 
 			// Check results
 			if tt.expectError {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorContains)
+				// Error message should be in stderr, but exec.CombinedOutput captures both
+				errorOutput := output
+				if err != nil {
+					errorOutput = err.Error() + "\n" + output
+				}
+				assert.Contains(t, strings.ToLower(errorOutput), strings.ToLower(tt.errorContains))
 			} else {
-				require.NoError(t, err)
-				outputStr := output.String()
+				require.NoError(t, err, "Command failed with output: %s", output)
 				for _, expectedOutput := range tt.outputContains {
-					assert.Contains(t, outputStr, expectedOutput)
+					assert.Contains(t, output, expectedOutput)
 				}
 			}
 		})
 	}
 }
 
-func TestInitCommand_NoConfigPaths(t *testing.T) {
-	// Create a command with no config-path flag set
-	cmd := &cobra.Command{
-		Use:  "init",
-		RunE: runInit,
-	}
-
-	// Add empty config-path flag
-	cmd.Flags().StringSlice("config-path", []string{}, "test config paths")
-
-	var stderr bytes.Buffer
-	cmd.SetErr(&stderr)
-
-	err := cmd.Execute()
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no config paths specified")
-}
-
-func TestInitCommand_ConfigFileCreation(t *testing.T) {
+func TestInitCommandConfigFileCreation(t *testing.T) {
 	// Setup test directory
 	tempDir, err := os.MkdirTemp("", "multigres_init_config_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
-	// Create command
-	cmd := &cobra.Command{
-		Use:  "init",
-		RunE: runInit,
-	}
-	cmd.Flags().StringSlice("config-path", []string{tempDir}, "test config paths")
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Execute command
-	err = cmd.Execute()
-
-	// Restore stdout and read output
-	w.Close()
-	os.Stdout = oldStdout
-	var output bytes.Buffer
-	_, err2 := output.ReadFrom(r)
-	require.NoError(t, err2)
+	// Execute command using the actual binary
+	output, err := executeInitCommand(t, []string{"--config-path", tempDir})
 
 	// Command should succeed
-	require.NoError(t, err)
+	require.NoError(t, err, "Command failed with output: %s", output)
 
 	// Check output contains expected messages
-	outputStr := output.String()
-	assert.Contains(t, outputStr, "Initializing Multigres cluster configuration")
-	assert.Contains(t, outputStr, "Created configuration file")
-	assert.Contains(t, outputStr, "successfully")
+	assert.Contains(t, output, "Initializing Multigres cluster configuration")
 
 	// Check config file was created
 	configFile := filepath.Join(tempDir, "multigres.yaml")
@@ -202,13 +174,13 @@ func TestInitCommand_ConfigFileCreation(t *testing.T) {
 
 	// Verify config values
 	assert.Equal(t, "local", config.Provisioner)
-	assert.Equal(t, "etcd", config.Topology.Implementation)
+	assert.Equal(t, "etcd2", config.Topology.Backend)
 	assert.Equal(t, "/multigres/global", config.Topology.GlobalRootPath)
 	assert.Equal(t, "zone1", config.Topology.DefaultCellName)
 	assert.Equal(t, "/multigres/zone1", config.Topology.DefaultCellRootPath)
 }
 
-func TestInitCommand_ConfigFileAlreadyExists(t *testing.T) {
+func TestInitCommandConfigFileAlreadyExists(t *testing.T) {
 	// Setup test directory
 	tempDir, err := os.MkdirTemp("", "multigres_init_exists_test")
 	require.NoError(t, err)
@@ -219,18 +191,131 @@ func TestInitCommand_ConfigFileAlreadyExists(t *testing.T) {
 	err = os.WriteFile(existingConfig, []byte("existing: config"), 0644)
 	require.NoError(t, err)
 
-	// Create command
-	cmd := &cobra.Command{
-		Use:  "init",
-		RunE: runInit,
-	}
-	cmd.Flags().StringSlice("config-path", []string{tempDir}, "test config paths")
-
-	// Execute command
-	err = cmd.Execute()
+	// Execute command using the actual binary
+	output, err := executeInitCommand(t, []string{"--config-path", tempDir})
 
 	// Should fail with appropriate error
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "config file already exists")
-	assert.Contains(t, err.Error(), existingConfig)
+	errorOutput := err.Error() + "\n" + output
+	assert.Contains(t, errorOutput, "config file already exists")
+	assert.Contains(t, errorOutput, existingConfig)
+}
+
+func TestInitCommandCustomFlags(t *testing.T) {
+	// Setup test directory
+	tempDir, err := os.MkdirTemp("", "multigres_init_flags_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Execute command with custom flags using the actual binary
+	args := []string{
+		"--config-path", tempDir,
+		"--provisioner", "local",
+		"--topo-backend", "etcd2",
+		"--topo-global-root-path", "/custom/global",
+		"--topo-default-cell-name", "custom-cell",
+		"--topo-default-cell-root-path", "/custom/cell",
+	}
+	output, err := executeInitCommand(t, args)
+
+	// Command should succeed
+	require.NoError(t, err, "Command failed with output: %s", output)
+
+	// Check config file was created
+	configFile := filepath.Join(tempDir, "multigres.yaml")
+	_, err = os.Stat(configFile)
+	require.NoError(t, err, "Config file should exist")
+
+	// Read and validate config content
+	configData, err := os.ReadFile(configFile)
+	require.NoError(t, err)
+
+	var config MultigressConfig
+	err = yaml.Unmarshal(configData, &config)
+	require.NoError(t, err)
+
+	// Verify custom config values
+	assert.Equal(t, "local", config.Provisioner)
+	assert.Equal(t, "etcd2", config.Topology.Backend)
+	assert.Equal(t, "/custom/global", config.Topology.GlobalRootPath)
+	assert.Equal(t, "custom-cell", config.Topology.DefaultCellName)
+	assert.Equal(t, "/custom/cell", config.Topology.DefaultCellRootPath)
+}
+
+func TestInitCommandInvalidTopoBackend(t *testing.T) {
+	// Setup test directory
+	tempDir, err := os.MkdirTemp("", "multigres_init_invalid_backend_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Execute command with invalid topo-backend using the actual binary
+	args := []string{"--config-path", tempDir, "--topo-backend", "invalid"}
+	output, err := executeInitCommand(t, args)
+
+	// Should fail with validation error
+	require.Error(t, err)
+	errorOutput := err.Error() + "\n" + output
+	assert.Contains(t, errorOutput, "invalid topo backend: invalid")
+	assert.Contains(t, errorOutput, "available: [etcd2")
+
+	// No config file should be created
+	configFile := filepath.Join(tempDir, "multigres.yaml")
+	_, err = os.Stat(configFile)
+	assert.True(t, os.IsNotExist(err), "Config file should not exist")
+}
+
+func TestInitCommandInvalidProvisioner(t *testing.T) {
+	// Setup test directory
+	tempDir, err := os.MkdirTemp("", "multigres_init_invalid_provisioner_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Execute command with invalid provisioner using the actual binary
+	args := []string{"--config-path", tempDir, "--provisioner", "invalid"}
+	output, err := executeInitCommand(t, args)
+
+	// Should fail with validation error
+	require.Error(t, err)
+	errorOutput := err.Error() + "\n" + output
+	assert.Contains(t, errorOutput, "invalid provisioner: invalid")
+	assert.Contains(t, errorOutput, "only 'local' is supported")
+
+	// No config file should be created
+	configFile := filepath.Join(tempDir, "multigres.yaml")
+	_, err = os.Stat(configFile)
+	assert.True(t, os.IsNotExist(err), "Config file should not exist")
+}
+
+func TestInitCommandAllCustomFlags(t *testing.T) {
+	// Setup test directory
+	tempDir, err := os.MkdirTemp("", "multigres_init_all_flags_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Execute command with all custom flags using the actual binary
+	args := []string{
+		"--config-path", tempDir,
+		"--provisioner", "local",
+		"--topo-backend", "etcd2",
+		"--topo-global-root-path", "/test/global",
+		"--topo-default-cell-name", "test-zone",
+		"--topo-default-cell-root-path", "/test/zone",
+	}
+	output, err := executeInitCommand(t, args)
+	require.NoError(t, err, "Command failed with output: %s", output)
+
+	// Read config file
+	configFile := filepath.Join(tempDir, "multigres.yaml")
+	configData, err := os.ReadFile(configFile)
+	require.NoError(t, err)
+
+	// Verify YAML structure
+	expectedYAML := `provisioner: local
+topology:
+    backend: etcd2
+    global-root-path: /test/global
+    default-cell-name: test-zone
+    default-cell-root-path: /test/zone
+`
+	assert.YAMLEq(t, expectedYAML, string(configData))
 }

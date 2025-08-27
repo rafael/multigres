@@ -18,6 +18,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/multigres/multigres/go/clustermetadata/topo"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -25,7 +28,7 @@ import (
 
 // TopologyConfig holds the configuration for cluster topology
 type TopologyConfig struct {
-	Implementation      string `yaml:"implementation"`
+	Backend             string `yaml:"backend"`
 	GlobalRootPath      string `yaml:"global-root-path"`
 	DefaultCellName     string `yaml:"default-cell-name"`
 	DefaultCellRootPath string `yaml:"default-cell-root-path"`
@@ -37,12 +40,17 @@ type MultigressConfig struct {
 	Topology    TopologyConfig `yaml:"topology"`
 }
 
+// getAvailableTopoImplementations returns a list of registered topo implementations
+func getAvailableTopoImplementations() []string {
+	return topo.GetAvailableImplementations()
+}
+
 // DefaultConfig returns a MultigressConfig with default values
 func DefaultConfig() *MultigressConfig {
 	return &MultigressConfig{
 		Provisioner: "local",
 		Topology: TopologyConfig{
-			Implementation:      "etcd",
+			Backend:             "etcd2",
 			GlobalRootPath:      "/multigres/global",
 			DefaultCellName:     "zone1",
 			DefaultCellRootPath: "/multigres/zone1",
@@ -85,10 +93,72 @@ func validateConfigPaths(cmd *cobra.Command) ([]string, error) {
 	return configPaths, nil
 }
 
+// buildConfigFromFlags creates a MultigressConfig based on command flags
+func buildConfigFromFlags(cmd *cobra.Command) (*MultigressConfig, error) {
+	// Start with default config
+	config := DefaultConfig()
+
+	// Override with flag values if provided
+	if provisioner, _ := cmd.Flags().GetString("provisioner"); provisioner != "" {
+		config.Provisioner = provisioner
+	}
+
+	if topoBackend, _ := cmd.Flags().GetString("topo-backend"); topoBackend != "" {
+		config.Topology.Backend = topoBackend
+	}
+
+	if globalRootPath, _ := cmd.Flags().GetString("topo-global-root-path"); globalRootPath != "" {
+		config.Topology.GlobalRootPath = globalRootPath
+	}
+
+	if defaultCellName, _ := cmd.Flags().GetString("topo-default-cell-name"); defaultCellName != "" {
+		config.Topology.DefaultCellName = defaultCellName
+	}
+
+	if defaultCellRootPath, _ := cmd.Flags().GetString("topo-default-cell-root-path"); defaultCellRootPath != "" {
+		config.Topology.DefaultCellRootPath = defaultCellRootPath
+	}
+
+	return config, nil
+}
+
+// validateConfig validates the configuration values
+func validateConfig(cmd *cobra.Command, config *MultigressConfig) error {
+	// Validate provisioner
+	if config.Provisioner != "local" {
+		cmd.SilenceUsage = true
+		return fmt.Errorf("invalid provisioner: %s (only 'local' is supported)", config.Provisioner)
+	}
+
+	// Validate topo backend
+	availableBackends := getAvailableTopoImplementations()
+	validBackend := false
+	for _, backend := range availableBackends {
+		if config.Topology.Backend == backend {
+			validBackend = true
+			break
+		}
+	}
+	if !validBackend {
+		cmd.SilenceUsage = true
+		return fmt.Errorf("invalid topo backend: %s (available: %v)", config.Topology.Backend, availableBackends)
+	}
+
+	return nil
+}
+
 // createConfigFile creates and writes the multigres configuration file
 func createConfigFile(cmd *cobra.Command, configPaths []string) (string, error) {
-	// Create default configuration
-	config := DefaultConfig()
+	// Build configuration from flags
+	config, err := buildConfigFromFlags(cmd)
+	if err != nil {
+		return "", err
+	}
+
+	// Validate configuration
+	if err := validateConfig(cmd, config); err != nil {
+		return "", err
+	}
 
 	// Marshal to YAML
 	yamlData, err := yaml.Marshal(config)
@@ -142,4 +212,17 @@ var Command = &cobra.Command{
 	Short: "Create a local cluster configuration",
 	Long:  "Initialize a new local Multigres cluster configuration that can be used with 'multigres cluster up'.",
 	RunE:  runInit,
+}
+
+func init() {
+	// Add flags for configuration options
+	availableBackends := getAvailableTopoImplementations()
+	backendsStr := strings.Join(availableBackends, ", ")
+
+	Command.Flags().StringSlice("config-path", []string{"."}, "Directories where configuration files will be created")
+	Command.Flags().String("provisioner", "local", "Provisioner to use (only 'local' is supported)")
+	Command.Flags().String("topo-backend", "etcd2", fmt.Sprintf("Topology backend to use (available: %s)", backendsStr))
+	Command.Flags().String("topo-global-root-path", "/multigres/global", "Global topology root path")
+	Command.Flags().String("topo-default-cell-name", "zone1", "Default cell name")
+	Command.Flags().String("topo-default-cell-root-path", "/multigres/zone1", "Default cell root path")
 }
