@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cluster
+package status
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var StatusCommand = &cobra.Command{
+var Command = &cobra.Command{
 	Use:   "status",
 	Short: "Show cluster health",
 	Long:  "Display the current health and status of the Multigres cluster.",

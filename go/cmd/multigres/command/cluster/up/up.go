@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cluster
+package up
 
 import (
 	"fmt"
@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/multigres/multigres/go/cmd/multigres/command/cluster"
 	"github.com/multigres/multigres/go/servenv"
 
 	"github.com/spf13/cobra"
@@ -201,7 +202,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load configuration
-	config, configFile, err := LoadConfig(configPaths)
+	config, configFile, err := cluster.LoadConfig(configPaths)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
@@ -227,7 +228,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-var UpCommand = &cobra.Command{
+var Command = &cobra.Command{
 	Use:   "up",
 	Short: "Start local cluster",
 	Long:  "Start a local Multigres cluster using the configuration created with 'multigres cluster init'.",

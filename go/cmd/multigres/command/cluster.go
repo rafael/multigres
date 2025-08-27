@@ -15,7 +15,10 @@
 package command
 
 import (
-	"github.com/multigres/multigres/go/cmd/multigres/command/cluster"
+	"github.com/multigres/multigres/go/cmd/multigres/command/cluster/down"
+	initcmd "github.com/multigres/multigres/go/cmd/multigres/command/cluster/init"
+	"github.com/multigres/multigres/go/cmd/multigres/command/cluster/status"
+	"github.com/multigres/multigres/go/cmd/multigres/command/cluster/up"
 
 	"github.com/spf13/cobra"
 )
@@ -28,10 +31,10 @@ var clusterCmd = &cobra.Command{
 
 func init() {
 	// Add cluster subcommands
-	clusterCmd.AddCommand(cluster.InitCommand)
-	clusterCmd.AddCommand(cluster.UpCommand)
-	clusterCmd.AddCommand(cluster.DownCommand)
-	clusterCmd.AddCommand(cluster.StatusCommand)
+	clusterCmd.AddCommand(initcmd.Command)
+	clusterCmd.AddCommand(up.Command)
+	clusterCmd.AddCommand(down.Command)
+	clusterCmd.AddCommand(status.Command)
 
 	// Register cluster command with root
 	Root.AddCommand(clusterCmd)

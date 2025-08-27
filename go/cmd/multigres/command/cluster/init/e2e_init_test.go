@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cluster
+package init
 
 import (
 	"os"
@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/multigres/multigres/go/cmd/multigres/command/cluster"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,10 +39,11 @@ func executeInitCommand(t *testing.T, args []string) (string, error) {
 
 	// Build multigres binary for testing (following pgctld pattern)
 	multigresBinary := filepath.Join(binaryDir, "multigres")
-	buildCmd := exec.Command("go", "build", "-o", multigresBinary, "github.com/multigres/multigres/go/cmd/multigres")
+	buildCmd := exec.Command("go", "build", "-o", multigresBinary, "../../..")
 
-	// Set working directory to the project root
-	buildCmd.Dir = "."
+	// Set working directory to avoid issues with temp paths
+	wd, _ := os.Getwd()
+	buildCmd.Dir = wd
 
 	buildOutput, err := buildCmd.CombinedOutput()
 	if err != nil {
@@ -175,7 +178,7 @@ func TestInitCommandConfigFileCreation(t *testing.T) {
 	configData, err := os.ReadFile(configFile)
 	require.NoError(t, err)
 
-	var config MultigressConfig
+	var config cluster.MultigressConfig
 	err = yaml.Unmarshal(configData, &config)
 	require.NoError(t, err)
 
@@ -245,7 +248,7 @@ func TestInitCommandCustomFlags(t *testing.T) {
 	configData, err := os.ReadFile(configFile)
 	require.NoError(t, err)
 
-	var config MultigressConfig
+	var config cluster.MultigressConfig
 	err = yaml.Unmarshal(configData, &config)
 	require.NoError(t, err)
 

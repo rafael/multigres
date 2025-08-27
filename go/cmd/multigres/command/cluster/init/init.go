@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cluster
+package init
 
 import (
 	"fmt"
@@ -21,6 +21,8 @@ import (
 	"strings"
 
 	"github.com/multigres/multigres/go/clustermetadata/topo"
+	"github.com/multigres/multigres/go/cmd/multigres/command/cluster"
+
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -66,9 +68,9 @@ func validateConfigPaths(cmd *cobra.Command) ([]string, error) {
 }
 
 // buildConfigFromFlags creates a cluster.MultigressConfig based on command flags
-func buildConfigFromFlags(cmd *cobra.Command) (*MultigressConfig, error) {
+func buildConfigFromFlags(cmd *cobra.Command) (*cluster.MultigressConfig, error) {
 	// Start with default config
-	config := DefaultConfig()
+	config := cluster.DefaultConfig()
 
 	// Override with flag values if provided
 	if provisioner, _ := cmd.Flags().GetString("provisioner"); provisioner != "" {
@@ -99,7 +101,7 @@ func buildConfigFromFlags(cmd *cobra.Command) (*MultigressConfig, error) {
 }
 
 // validateConfig validates the configuration values
-func validateConfig(cmd *cobra.Command, config *MultigressConfig) error {
+func validateConfig(cmd *cobra.Command, config *cluster.MultigressConfig) error {
 	// Validate provisioner
 	if config.Provisioner != "local" {
 		cmd.SilenceUsage = true
@@ -183,7 +185,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-var InitCommand = &cobra.Command{
+var Command = &cobra.Command{
 	Use:   "init",
 	Short: "Create a local cluster configuration",
 	Long:  "Initialize a new local Multigres cluster configuration that can be used with 'multigres cluster up'.",
@@ -195,10 +197,10 @@ func init() {
 	availableBackends := getAvailableTopoImplementations()
 	backendsStr := strings.Join(availableBackends, ", ")
 
-	InitCommand.Flags().String("provisioner", "local", "Provisioner to use (only 'local' is supported)")
-	InitCommand.Flags().String("topo-backend", "etcd2", fmt.Sprintf("Topology backend to use (available: %s)", backendsStr))
-	InitCommand.Flags().String("topo-global-root-path", "/multigres/global", "Global topology root path")
-	InitCommand.Flags().String("topo-default-cell-name", "zone1", "Default cell name")
-	InitCommand.Flags().String("topo-default-cell-root-path", "/multigres/zone1", "Default cell root path")
-	InitCommand.Flags().String("topo-etcd-default-address", "localhost:2379", "Default etcd address with port")
+	Command.Flags().String("provisioner", "local", "Provisioner to use (only 'local' is supported)")
+	Command.Flags().String("topo-backend", "etcd2", fmt.Sprintf("Topology backend to use (available: %s)", backendsStr))
+	Command.Flags().String("topo-global-root-path", "/multigres/global", "Global topology root path")
+	Command.Flags().String("topo-default-cell-name", "zone1", "Default cell name")
+	Command.Flags().String("topo-default-cell-root-path", "/multigres/zone1", "Default cell root path")
+	Command.Flags().String("topo-etcd-default-address", "localhost:2379", "Default etcd address with port")
 }
