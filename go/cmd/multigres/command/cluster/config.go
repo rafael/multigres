@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 
@@ -72,4 +73,12 @@ func LoadConfig(configPaths []string) (*MultigressConfig, string, error) {
 	}
 
 	return nil, "", fmt.Errorf("multigres.yaml not found in any of the provided paths: %v", configPaths)
+}
+
+// RegisterCommands registers all cluster subcommands with the given parent command
+func RegisterCommands(parent *cobra.Command) {
+	parent.AddCommand(InitCommand)
+	parent.AddCommand(UpCommand)
+	parent.AddCommand(DownCommand)
+	parent.AddCommand(StatusCommand)
 }

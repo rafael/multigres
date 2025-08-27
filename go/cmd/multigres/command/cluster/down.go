@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package down
+package cluster
 
 import (
 	"fmt"
 	"os/exec"
 	"strings"
 
-	"github.com/multigres/multigres/go/cmd/multigres/command/cluster"
 	"github.com/multigres/multigres/go/servenv"
 
 	"github.com/spf13/cobra"
@@ -122,7 +121,7 @@ func runDown(cmd *cobra.Command, args []string) error {
 	}
 
 	// Try to load configuration for context, but don't fail if it's not found
-	config, configFile, err := cluster.LoadConfig(configPaths)
+	config, configFile, err := LoadConfig(configPaths)
 	if err == nil {
 		fmt.Printf("Using configuration from: %s\n", configFile)
 		fmt.Printf("Stopping cluster with etcd at: %s\n", config.Topology.EtcdDefaultAddress)
@@ -139,7 +138,7 @@ func runDown(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-var Command = &cobra.Command{
+var DownCommand = &cobra.Command{
 	Use:   "down",
 	Short: "Stop local cluster",
 	Long:  "Stop the local Multigres cluster. Use --clean to fully tear down all resources.",
@@ -147,6 +146,6 @@ var Command = &cobra.Command{
 }
 
 func init() {
-	Command.Flags().Bool("clean", false, "Fully tear down all cluster resources")
+	DownCommand.Flags().Bool("clean", false, "Fully tear down all cluster resources")
 	// config-path is provided by viperutil via root command
 }
