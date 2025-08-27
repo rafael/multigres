@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/multigres/multigres/go/cmd/multigres/command/cluster"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -176,7 +178,7 @@ func TestInitCommandConfigFileCreation(t *testing.T) {
 	configData, err := os.ReadFile(configFile)
 	require.NoError(t, err)
 
-	var config MultigressConfig
+	var config cluster.MultigressConfig
 	err = yaml.Unmarshal(configData, &config)
 	require.NoError(t, err)
 
@@ -246,7 +248,7 @@ func TestInitCommandCustomFlags(t *testing.T) {
 	configData, err := os.ReadFile(configFile)
 	require.NoError(t, err)
 
-	var config MultigressConfig
+	var config cluster.MultigressConfig
 	err = yaml.Unmarshal(configData, &config)
 	require.NoError(t, err)
 

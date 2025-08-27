@@ -21,41 +21,15 @@ import (
 	"strings"
 
 	"github.com/multigres/multigres/go/clustermetadata/topo"
+	"github.com/multigres/multigres/go/cmd/multigres/command/cluster"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 
-// TopologyConfig holds the configuration for cluster topology
-type TopologyConfig struct {
-	Backend             string `yaml:"backend"`
-	GlobalRootPath      string `yaml:"global-root-path"`
-	DefaultCellName     string `yaml:"default-cell-name"`
-	DefaultCellRootPath string `yaml:"default-cell-root-path"`
-}
-
-// MultigressConfig represents the structure of the multigres configuration file
-type MultigressConfig struct {
-	Provisioner string         `yaml:"provisioner"`
-	Topology    TopologyConfig `yaml:"topology"`
-}
-
 // getAvailableTopoImplementations returns a list of registered topo implementations
 func getAvailableTopoImplementations() []string {
 	return topo.GetAvailableImplementations()
-}
-
-// DefaultConfig returns a MultigressConfig with default values
-func DefaultConfig() *MultigressConfig {
-	return &MultigressConfig{
-		Provisioner: "local",
-		Topology: TopologyConfig{
-			Backend:             "etcd2",
-			GlobalRootPath:      "/multigres/global",
-			DefaultCellName:     "zone1",
-			DefaultCellRootPath: "/multigres/zone1",
-		},
-	}
 }
 
 // validateConfigPaths validates that the provided config paths exist and are directories
@@ -93,10 +67,10 @@ func validateConfigPaths(cmd *cobra.Command) ([]string, error) {
 	return configPaths, nil
 }
 
-// buildConfigFromFlags creates a MultigressConfig based on command flags
-func buildConfigFromFlags(cmd *cobra.Command) (*MultigressConfig, error) {
+// buildConfigFromFlags creates a cluster.MultigressConfig based on command flags
+func buildConfigFromFlags(cmd *cobra.Command) (*cluster.MultigressConfig, error) {
 	// Start with default config
-	config := DefaultConfig()
+	config := cluster.DefaultConfig()
 
 	// Override with flag values if provided
 	if provisioner, _ := cmd.Flags().GetString("provisioner"); provisioner != "" {
@@ -119,11 +93,15 @@ func buildConfigFromFlags(cmd *cobra.Command) (*MultigressConfig, error) {
 		config.Topology.DefaultCellRootPath = defaultCellRootPath
 	}
 
+	if etcdDefaultAddress, _ := cmd.Flags().GetString("topo-etcd-default-address"); etcdDefaultAddress != "" {
+		config.Topology.EtcdDefaultAddress = etcdDefaultAddress
+	}
+
 	return config, nil
 }
 
 // validateConfig validates the configuration values
-func validateConfig(cmd *cobra.Command, config *MultigressConfig) error {
+func validateConfig(cmd *cobra.Command, config *cluster.MultigressConfig) error {
 	// Validate provisioner
 	if config.Provisioner != "local" {
 		cmd.SilenceUsage = true
@@ -225,4 +203,5 @@ func init() {
 	Command.Flags().String("topo-global-root-path", "/multigres/global", "Global topology root path")
 	Command.Flags().String("topo-default-cell-name", "zone1", "Default cell name")
 	Command.Flags().String("topo-default-cell-root-path", "/multigres/zone1", "Default cell root path")
+	Command.Flags().String("topo-etcd-default-address", "localhost:2379", "Default etcd address with port")
 }
