@@ -57,6 +57,10 @@ func executeInitCommand(t *testing.T, args []string) (string, error) {
 }
 
 func TestInitCommand(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test in short mode")
+	}
+
 	tests := []struct {
 		name           string
 		setupDirs      func(*testing.T) ([]string, func()) // returns config paths and cleanup
@@ -145,6 +149,10 @@ func TestInitCommand(t *testing.T) {
 }
 
 func TestInitCommandConfigFileCreation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test in short mode")
+	}
+
 	// Setup test directory
 	tempDir, err := os.MkdirTemp("", "multigres_init_config_test")
 	require.NoError(t, err)
@@ -181,6 +189,10 @@ func TestInitCommandConfigFileCreation(t *testing.T) {
 }
 
 func TestInitCommandConfigFileAlreadyExists(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test in short mode")
+	}
+
 	// Setup test directory
 	tempDir, err := os.MkdirTemp("", "multigres_init_exists_test")
 	require.NoError(t, err)
@@ -202,6 +214,10 @@ func TestInitCommandConfigFileAlreadyExists(t *testing.T) {
 }
 
 func TestInitCommandCustomFlags(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test in short mode")
+	}
+
 	// Setup test directory
 	tempDir, err := os.MkdirTemp("", "multigres_init_flags_test")
 	require.NoError(t, err)
@@ -243,6 +259,10 @@ func TestInitCommandCustomFlags(t *testing.T) {
 }
 
 func TestInitCommandInvalidTopoBackend(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test in short mode")
+	}
+
 	// Setup test directory
 	tempDir, err := os.MkdirTemp("", "multigres_init_invalid_backend_test")
 	require.NoError(t, err)
@@ -265,6 +285,10 @@ func TestInitCommandInvalidTopoBackend(t *testing.T) {
 }
 
 func TestInitCommandInvalidProvisioner(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test in short mode")
+	}
+
 	// Setup test directory
 	tempDir, err := os.MkdirTemp("", "multigres_init_invalid_provisioner_test")
 	require.NoError(t, err)
@@ -287,6 +311,10 @@ func TestInitCommandInvalidProvisioner(t *testing.T) {
 }
 
 func TestInitCommandAllCustomFlags(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping e2e test in short mode")
+	}
+
 	// Setup test directory
 	tempDir, err := os.MkdirTemp("", "multigres_init_all_flags_test")
 	require.NoError(t, err)
