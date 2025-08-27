@@ -236,6 +236,5 @@ var Command = &cobra.Command{
 }
 
 func init() {
-	// Add flags for configuration options
-	Command.Flags().StringSlice("config-path", []string{"."}, "Directories to search for configuration files")
+	// No additional flags needed - config-path is provided by viperutil via root command
 }

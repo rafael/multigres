@@ -148,5 +148,5 @@ var Command = &cobra.Command{
 
 func init() {
 	Command.Flags().Bool("clean", false, "Fully tear down all cluster resources")
-	Command.Flags().StringSlice("config-path", []string{"."}, "Directories to search for configuration files")
+	// config-path is provided by viperutil via root command
 }

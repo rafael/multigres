@@ -197,7 +197,6 @@ func init() {
 	availableBackends := getAvailableTopoImplementations()
 	backendsStr := strings.Join(availableBackends, ", ")
 
-	Command.Flags().StringSlice("config-path", []string{"."}, "Directories where configuration files will be created")
 	Command.Flags().String("provisioner", "local", "Provisioner to use (only 'local' is supported)")
 	Command.Flags().String("topo-backend", "etcd2", fmt.Sprintf("Topology backend to use (available: %s)", backendsStr))
 	Command.Flags().String("topo-global-root-path", "/multigres/global", "Global topology root path")

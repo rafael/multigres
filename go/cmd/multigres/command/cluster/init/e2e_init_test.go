@@ -346,6 +346,7 @@ topology:
     global-root-path: /test/global
     default-cell-name: test-zone
     default-cell-root-path: /test/zone
+    etcd-default-address: localhost:2379
 `
 	assert.YAMLEq(t, expectedYAML, string(configData))
 }
