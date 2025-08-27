@@ -191,6 +191,11 @@ func runUp(cmd *cobra.Command, args []string) error {
 	servenv.FireRunHooks()
 	fmt.Println("Starting Multigres cluster...")
 
+	// Check if Docker is available early
+	if _, err := exec.LookPath("docker"); err != nil {
+		return fmt.Errorf("docker not found in PATH: %w", err)
+	}
+
 	// Get config paths from flags
 	configPaths, err := cmd.Flags().GetStringSlice("config-path")
 	if err != nil {
