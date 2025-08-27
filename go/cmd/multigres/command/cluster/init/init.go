@@ -20,47 +20,126 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
+
+// TopologyConfig holds the configuration for cluster topology
+type TopologyConfig struct {
+	Implementation      string `yaml:"implementation"`
+	GlobalRootPath      string `yaml:"global-root-path"`
+	DefaultCellName     string `yaml:"default-cell-name"`
+	DefaultCellRootPath string `yaml:"default-cell-root-path"`
+}
+
+// MultigressConfig represents the structure of the multigres configuration file
+type MultigressConfig struct {
+	Provisioner string         `yaml:"provisioner"`
+	Topology    TopologyConfig `yaml:"topology"`
+}
+
+// DefaultConfig returns a MultigressConfig with default values
+func DefaultConfig() *MultigressConfig {
+	return &MultigressConfig{
+		Provisioner: "local",
+		Topology: TopologyConfig{
+			Implementation:      "etcd",
+			GlobalRootPath:      "/multigres/global",
+			DefaultCellName:     "zone1",
+			DefaultCellRootPath: "/multigres/zone1",
+		},
+	}
+}
+
+// validateConfigPaths validates that the provided config paths exist and are directories
+func validateConfigPaths(cmd *cobra.Command) ([]string, error) {
+	configPaths, err := cmd.Flags().GetStringSlice("config-path")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get config-path flag: %w", err)
+	}
+	if len(configPaths) == 0 {
+		return nil, fmt.Errorf("no config paths specified")
+	}
+
+	for _, configPath := range configPaths {
+		absPath, err := filepath.Abs(configPath)
+		if err != nil {
+			cmd.SilenceUsage = true
+			return nil, fmt.Errorf("failed to resolve config path %s: %w", configPath, err)
+		}
+
+		if _, err := os.Stat(absPath); os.IsNotExist(err) {
+			cmd.SilenceUsage = true
+			return nil, fmt.Errorf("config path does not exist: %s", absPath)
+		} else if err != nil {
+			cmd.SilenceUsage = true
+			return nil, fmt.Errorf("failed to access config path %s: %w", absPath, err)
+		}
+
+		// Check if it's a directory
+		if info, err := os.Stat(absPath); err == nil && !info.IsDir() {
+			cmd.SilenceUsage = true
+			return nil, fmt.Errorf("config path is not a directory: %s", absPath)
+		}
+	}
+
+	return configPaths, nil
+}
+
+// createConfigFile creates and writes the multigres configuration file
+func createConfigFile(cmd *cobra.Command, configPaths []string) (string, error) {
+	// Create default configuration
+	config := DefaultConfig()
+
+	// Marshal to YAML
+	yamlData, err := yaml.Marshal(config)
+	if err != nil {
+		cmd.SilenceUsage = true
+		return "", fmt.Errorf("failed to marshal config to YAML: %w", err)
+	}
+
+	// Determine config file path - use the first config path
+	configDir := configPaths[0]
+	configFile := filepath.Join(configDir, "multigres.yaml")
+
+	// Check if config file already exists
+	if _, err := os.Stat(configFile); err == nil {
+		cmd.SilenceUsage = true
+		return "", fmt.Errorf("config file already exists: %s", configFile)
+	}
+
+	// Write config file
+	if err := os.WriteFile(configFile, yamlData, 0644); err != nil {
+		cmd.SilenceUsage = true
+		return "", fmt.Errorf("failed to write config file %s: %w", configFile, err)
+	}
+
+	return configFile, nil
+}
+
+// runInit handles the initialization of a multigres cluster configuration
+func runInit(cmd *cobra.Command, args []string) error {
+	// Validate config paths
+	configPaths, err := validateConfigPaths(cmd)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Initializing Multigres cluster configuration...")
+
+	// Create config file
+	configFile, err := createConfigFile(cmd, configPaths)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Created configuration file: %s\n", configFile)
+	fmt.Println("Cluster configuration created successfully!")
+	return nil
+}
 
 var Command = &cobra.Command{
 	Use:   "init",
 	Short: "Create a local cluster configuration",
 	Long:  "Initialize a new local Multigres cluster configuration that can be used with 'multigres cluster up'.",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Validate config paths exist
-		configPaths, err := cmd.Flags().GetStringSlice("config-path")
-		if err != nil {
-			return fmt.Errorf("failed to get config-path flag: %w", err)
-		}
-		if len(configPaths) == 0 {
-			return fmt.Errorf("no config paths specified")
-		}
-
-		for _, configPath := range configPaths {
-			absPath, err := filepath.Abs(configPath)
-			if err != nil {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to resolve config path %s: %w", configPath, err)
-			}
-
-			if _, err := os.Stat(absPath); os.IsNotExist(err) {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("config path does not exist: %s", absPath)
-			} else if err != nil {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("failed to access config path %s: %w", absPath, err)
-			}
-
-			// Check if it's a directory
-			if info, err := os.Stat(absPath); err == nil && !info.IsDir() {
-				cmd.SilenceUsage = true
-				return fmt.Errorf("config path is not a directory: %s", absPath)
-			}
-		}
-
-		fmt.Println("Initializing Multigres cluster configuration...")
-		// TODO: Implement cluster initialization logic
-		fmt.Println("Cluster configuration created successfully!")
-		return nil
-	},
+	RunE:  runInit,
 }

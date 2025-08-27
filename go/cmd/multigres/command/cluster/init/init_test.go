@@ -17,11 +17,13 @@ package init
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestInitCommand(t *testing.T) {
@@ -87,7 +89,7 @@ func TestInitCommand(t *testing.T) {
 			// Create a copy of the command for testing
 			cmd := &cobra.Command{
 				Use:  "init",
-				RunE: Command.RunE,
+				RunE: runInit,
 			}
 
 			// Add the config-path flag
@@ -133,7 +135,7 @@ func TestInitCommand_NoConfigPaths(t *testing.T) {
 	// Create a command with no config-path flag set
 	cmd := &cobra.Command{
 		Use:  "init",
-		RunE: Command.RunE,
+		RunE: runInit,
 	}
 
 	// Add empty config-path flag
@@ -146,4 +148,89 @@ func TestInitCommand_NoConfigPaths(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no config paths specified")
+}
+
+func TestInitCommand_ConfigFileCreation(t *testing.T) {
+	// Setup test directory
+	tempDir, err := os.MkdirTemp("", "multigres_init_config_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create command
+	cmd := &cobra.Command{
+		Use:  "init",
+		RunE: runInit,
+	}
+	cmd.Flags().StringSlice("config-path", []string{tempDir}, "test config paths")
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Execute command
+	err = cmd.Execute()
+
+	// Restore stdout and read output
+	w.Close()
+	os.Stdout = oldStdout
+	var output bytes.Buffer
+	_, err2 := output.ReadFrom(r)
+	require.NoError(t, err2)
+
+	// Command should succeed
+	require.NoError(t, err)
+
+	// Check output contains expected messages
+	outputStr := output.String()
+	assert.Contains(t, outputStr, "Initializing Multigres cluster configuration")
+	assert.Contains(t, outputStr, "Created configuration file")
+	assert.Contains(t, outputStr, "successfully")
+
+	// Check config file was created
+	configFile := filepath.Join(tempDir, "multigres.yaml")
+	_, err = os.Stat(configFile)
+	require.NoError(t, err, "Config file should exist")
+
+	// Read and validate config content
+	configData, err := os.ReadFile(configFile)
+	require.NoError(t, err)
+
+	var config MultigressConfig
+	err = yaml.Unmarshal(configData, &config)
+	require.NoError(t, err)
+
+	// Verify config values
+	assert.Equal(t, "local", config.Provisioner)
+	assert.Equal(t, "etcd", config.Topology.Implementation)
+	assert.Equal(t, "/multigres/global", config.Topology.GlobalRootPath)
+	assert.Equal(t, "zone1", config.Topology.DefaultCellName)
+	assert.Equal(t, "/multigres/zone1", config.Topology.DefaultCellRootPath)
+}
+
+func TestInitCommand_ConfigFileAlreadyExists(t *testing.T) {
+	// Setup test directory
+	tempDir, err := os.MkdirTemp("", "multigres_init_exists_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Create existing config file
+	existingConfig := filepath.Join(tempDir, "multigres.yaml")
+	err = os.WriteFile(existingConfig, []byte("existing: config"), 0644)
+	require.NoError(t, err)
+
+	// Create command
+	cmd := &cobra.Command{
+		Use:  "init",
+		RunE: runInit,
+	}
+	cmd.Flags().StringSlice("config-path", []string{tempDir}, "test config paths")
+
+	// Execute command
+	err = cmd.Execute()
+
+	// Should fail with appropriate error
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config file already exists")
+	assert.Contains(t, err.Error(), existingConfig)
 }
