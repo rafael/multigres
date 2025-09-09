@@ -48,23 +48,15 @@ func GetPoolerDir() string {
 	return poolerDir
 }
 
-// LoadPostgresServerConfig loads or creates a PostgreSQL server configuration.
-// If the config file exists, it reads and parses it. If it doesn't exist,
-// it generates a new one using the embedded template.
+// GeneratePostgresServerConfig generates a new PostgreSQL server configuration
+// and writes it to disk using the embedded template, then reads it back.
 // poolerId is used for the cluster name and path generation.
 // port is the port for the PostgreSQL server.
-func LoadPostgresServerConfig(poolerId string, port int) (*PostgresServerConfig, error) {
+func GeneratePostgresServerConfig(poolerId string, port int) (*PostgresServerConfig, error) {
 	configPath := PostgresConfigFile()
-
-	// Check if config file already exists
-	if _, err := os.Stat(configPath); err == nil {
-		// Config file exists, read it
-		cnf := &PostgresServerConfig{Path: configPath}
-		return ReadPostgresServerConfig(cnf, 0)
-	}
-
-	// Config file doesn't exist, create new config with template values
 	baseDir := PostgresBaseDir()
+
+	// Create minimal config for template generation
 	cnf := &PostgresServerConfig{}
 	cnf.Path = configPath
 	cnf.DataDir = baseDir
@@ -80,7 +72,26 @@ func LoadPostgresServerConfig(poolerId string, port int) (*PostgresServerConfig,
 		return nil, err
 	}
 
-	return cnf, nil
+	// Read the generated config back from disk to get all template values
+	return ReadPostgresServerConfig(cnf, 0)
+}
+
+// LoadOrCreatePostgresServerConfig loads an existing PostgreSQL server configuration
+// from disk, or generates and writes a new one if it doesn't exist.
+// poolerId is used for the cluster name and path generation.
+// port is the port for the PostgreSQL server.
+func LoadOrCreatePostgresServerConfig(poolerId string, port int) (*PostgresServerConfig, error) {
+	configPath := PostgresConfigFile()
+
+	// Check if config file already exists
+	if _, err := os.Stat(configPath); err == nil {
+		// Config file exists, read it
+		cnf := &PostgresServerConfig{Path: configPath}
+		return ReadPostgresServerConfig(cnf, 0)
+	}
+
+	// Config file doesn't exist, generate and write it
+	return GeneratePostgresServerConfig(poolerId, port)
 }
 
 // generateConfigFile creates the postgresql.conf file using the embedded template

@@ -17,13 +17,18 @@ limitations under the License.
 package pgctld
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewPostgresServerConfig(t *testing.T) {
-	// Set up poolerDir for testing
-	poolerDir = "/test/pooler"
+	// Set up poolerDir for testing using temporary directory
+	tempDir := t.TempDir()
+	originalPoolerDir := poolerDir
+	defer func() { poolerDir = originalPoolerDir }()
+	poolerDir = tempDir
 
 	tests := []struct {
 		name        string
@@ -39,7 +44,7 @@ func TestNewPostgresServerConfig(t *testing.T) {
 			port:        5432,
 			wantPort:    5432,
 			wantCluster: "test-pooler-1",
-			wantDataDir: "/test/pooler/pg",
+			wantDataDir: tempDir + "/pg",
 		},
 		{
 			name:        "custom port",
@@ -47,78 +52,69 @@ func TestNewPostgresServerConfig(t *testing.T) {
 			port:        5433,
 			wantPort:    5433,
 			wantCluster: "pooler-2",
-			wantDataDir: "/test/pooler/pg",
+			wantDataDir: tempDir + "/pg",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config, err := LoadPostgresServerConfig(tt.poolerId, tt.port)
-			if err != nil {
-				t.Fatalf("LoadPostgresServerConfig() error = %v", err)
-			}
+			config, err := GeneratePostgresServerConfig(tt.poolerId, tt.port)
+			require.NoError(t, err, "GeneratePostgresServerConfig should not return error")
 
-			if config.Port != tt.wantPort {
-				t.Errorf("Port = %v, want %v", config.Port, tt.wantPort)
-			}
+			assert.Equal(t, tt.wantPort, config.Port, "Port should match expected value")
 
-			if config.ClusterName != tt.wantCluster {
-				t.Errorf("ClusterName = %v, want %v", config.ClusterName, tt.wantCluster)
-			}
+			assert.Equal(t, tt.wantCluster, config.ClusterName, "ClusterName should match expected value")
 
-			if config.DataDir != tt.wantDataDir {
-				t.Errorf("DataDirectory = %v, want %v", config.DataDir, tt.wantDataDir)
-			}
+			assert.Equal(t, tt.wantDataDir, config.DataDir, "DataDir should match expected value")
 
-			if config.ListenAddresses != "localhost" {
-				t.Errorf("ListenAddresses = %v, want 'localhost'", config.ListenAddresses)
-			}
+			assert.Equal(t, "localhost", config.ListenAddresses, "ListenAddresses should be localhost")
 
-			if config.UnixSocketDirectories != "/tmp" {
-				t.Errorf("UnixSocketDirectories = %v, want '/tmp'", config.UnixSocketDirectories)
-			}
+			assert.Equal(t, "/tmp", config.UnixSocketDirectories, "UnixSocketDirectories should be /tmp")
 		})
 	}
 }
 
 func TestPostgresBaseDir(t *testing.T) {
-	// Set up poolerDir for testing
-	poolerDir = "/test/pooler"
+	// Set up poolerDir for testing using temporary directory
+	tempDir := t.TempDir()
+	originalPoolerDir := poolerDir
+	defer func() { poolerDir = originalPoolerDir }()
+	poolerDir = tempDir
 
-	expected := "/test/pooler/pg"
+	expected := tempDir + "/pg"
 	result := PostgresBaseDir()
 
-	if result != expected {
-		t.Errorf("PostgresBaseDir() = %v, want %v", result, expected)
-	}
+	assert.Equal(t, expected, result, "PostgresBaseDir should return expected path")
 }
 
 func TestPostgresConfigFile(t *testing.T) {
-	// Set up poolerDir for testing
-	poolerDir = "/test/pooler"
+	// Set up poolerDir for testing using temporary directory
+	tempDir := t.TempDir()
+	originalPoolerDir := poolerDir
+	defer func() { poolerDir = originalPoolerDir }()
+	poolerDir = tempDir
 
-	expected := "/test/pooler/pg/postgresql.conf"
+	expected := tempDir + "/pg/postgresql.conf"
 	result := PostgresConfigFile()
 
-	if result != expected {
-		t.Errorf("PostgresConfigFile() = %v, want %v", result, expected)
-	}
+	assert.Equal(t, expected, result, "PostgresConfigFile should return expected path")
 }
 
 func TestMakePostgresConf(t *testing.T) {
-	// Set up poolerDir for testing
-	poolerDir = "/test/pooler"
+	// Set up poolerDir for testing using temporary directory
+	tempDir := t.TempDir()
+	originalPoolerDir := poolerDir
+	defer func() { poolerDir = originalPoolerDir }()
+	poolerDir = tempDir
 
-	config, err := LoadPostgresServerConfig("test-pooler", 5432)
-	if err != nil {
-		t.Fatalf("LoadPostgresServerConfig() error = %v", err)
-	}
+	config, err := GeneratePostgresServerConfig("test-pooler", 5432)
+	require.NoError(t, err, "GeneratePostgresServerConfig should not return error")
 
 	tests := []struct {
 		name     string
 		template string
-		want     []string // strings that should be present in output
-		wantNot  []string // strings that should NOT be present in output
+		want     []string
+		wantNot  []string
 	}{
 		{
 			name:     "port template",
@@ -132,13 +128,13 @@ func TestMakePostgresConf(t *testing.T) {
 		},
 		{
 			name:     "data directory template",
-			template: "data_directory = '{{.DataDirectory}}'",
-			want:     []string{"data_directory = '/test/pooler/pg'"},
+			template: "data_directory = '{{.DataDir}}'",
+			want:     []string{"data_directory = '" + tempDir + "/pg'"},
 		},
 		{
 			name:     "max connections template",
 			template: "max_connections = {{.MaxConnections}}",
-			want:     []string{"max_connections = 100"},
+			want:     []string{"max_connections = 500"},
 		},
 		{
 			name:     "listen addresses template",
@@ -156,14 +152,14 @@ func TestMakePostgresConf(t *testing.T) {
 port = {{.Port}}
 max_connections = {{.MaxConnections}}
 listen_addresses = '{{.ListenAddresses}}'
-data_directory = '{{.DataDirectory}}'
+data_directory = '{{.DataDir}}'
 cluster_name = '{{.ClusterName}}'
 unix_socket_directories = '{{.UnixSocketDirectories}}'`,
 			want: []string{
 				"port = 5432",
-				"max_connections = 100",
+				"max_connections = 500",
 				"listen_addresses = 'localhost'",
-				"data_directory = '/test/pooler/pg'",
+				"data_directory = '" + tempDir + "/pg'",
 				"cluster_name = 'test-pooler'",
 				"unix_socket_directories = '/tmp'",
 				"# PostgreSQL Configuration",
@@ -174,35 +170,30 @@ unix_socket_directories = '{{.UnixSocketDirectories}}'`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := config.MakePostgresConf(tt.template)
-			if err != nil {
-				t.Fatalf("MakePostgresConf() error = %v", err)
-			}
+			require.NoError(t, err, "MakePostgresConf should not return error")
 
 			// Check that wanted strings are present
 			for _, want := range tt.want {
-				if !strings.Contains(result, want) {
-					t.Errorf("MakePostgresConf() result missing expected string: %q\nFull result:\n%s", want, result)
-				}
+				assert.Contains(t, result, want, "Result should contain expected string")
 			}
 
 			// Check that unwanted strings are not present
 			for _, wantNot := range tt.wantNot {
-				if strings.Contains(result, wantNot) {
-					t.Errorf("MakePostgresConf() result contains unwanted string: %q\nFull result:\n%s", wantNot, result)
-				}
+				assert.NotContains(t, result, wantNot, "Result should not contain unwanted string")
 			}
 		})
 	}
 }
 
 func TestMakePostgresConfInvalidTemplate(t *testing.T) {
-	// Set up poolerDir for testing
-	poolerDir = "/test/pooler"
+	// Set up poolerDir for testing using temporary directory
+	tempDir := t.TempDir()
+	originalPoolerDir := poolerDir
+	defer func() { poolerDir = originalPoolerDir }()
+	poolerDir = tempDir
 
-	config, err := LoadPostgresServerConfig("test-pooler", 5432)
-	if err != nil {
-		t.Fatalf("LoadPostgresServerConfig() error = %v", err)
-	}
+	config, err := GeneratePostgresServerConfig("test-pooler", 5432)
+	require.NoError(t, err, "GeneratePostgresServerConfig should not return error")
 
 	tests := []struct {
 		name     string
@@ -221,30 +212,24 @@ func TestMakePostgresConfInvalidTemplate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := config.MakePostgresConf(tt.template)
-			if err == nil {
-				t.Errorf("MakePostgresConf() expected error for invalid template, got nil")
-			}
+			assert.Error(t, err, "MakePostgresConf should return error for invalid template")
 		})
 	}
 }
 
 func TestGetPoolerDir(t *testing.T) {
-	// Set up poolerDir for testing
+	// Set up poolerDir for testing using temporary directory
+	tempDir := t.TempDir()
 	originalPoolerDir := poolerDir
 	defer func() { poolerDir = originalPoolerDir }()
 
-	testDir := "/test/custom/pooler"
-	poolerDir = testDir
+	poolerDir = tempDir
 
 	result := GetPoolerDir()
-	if result != testDir {
-		t.Errorf("GetPoolerDir() = %v, want %v", result, testDir)
-	}
+	assert.Equal(t, tempDir, result, "GetPoolerDir should return configured directory")
 
 	// Test empty case
 	poolerDir = ""
 	result = GetPoolerDir()
-	if result != "" {
-		t.Errorf("GetPoolerDir() = %v, want empty string", result)
-	}
+	assert.Equal(t, "", result, "GetPoolerDir should return empty string when not configured")
 }
