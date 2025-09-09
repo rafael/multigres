@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/multigres/multigres/go/pgctld"
+
 	"github.com/spf13/cobra"
 )
 
@@ -59,7 +61,7 @@ Examples:
 }
 
 // GetVersionWithResult gets PostgreSQL server version information and returns detailed result information
-func GetVersionWithResult(config *PostgresCtlConfig) (*VersionResult, error) {
+func GetVersionWithResult(config *pgctld.PostgresCtlConfig) (*VersionResult, error) {
 	result := &VersionResult{}
 
 	// Get server version using the same method as the gRPC service
@@ -74,7 +76,10 @@ func GetVersionWithResult(config *PostgresCtlConfig) (*VersionResult, error) {
 }
 
 func runVersion(cmd *cobra.Command, args []string) error {
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
 
 	// No local flag overrides needed - all flags are global now
 

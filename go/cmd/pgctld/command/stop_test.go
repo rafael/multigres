@@ -25,29 +25,33 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/multigres/multigres/go/cmd/pgctld/testutil"
+	"github.com/multigres/multigres/go/pgctld"
 )
 
 func TestStopPostgreSQLWithResult(t *testing.T) {
 	tests := []struct {
 		name           string
-		setupDataDir   func(string) string
+		setupPoolerDir func(string) string
 		setupBinaries  bool
 		mode           string
-		config         func(*PostgresCtlConfig) *PostgresCtlConfig
+		config         func(*pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig
 		expectError    bool
 		errorContains  string
 		expectedResult func(*StopResult)
 	}{
 		{
 			name: "successful stop with fast mode",
-			setupDataDir: func(baseDir string) string {
-				dataDir := testutil.CreateDataDir(t, baseDir, true)
-				testutil.CreatePIDFile(t, dataDir, 12345)
-				return dataDir
+			setupPoolerDir: func(baseDir string) string {
+				poolerDir := baseDir
+				pgctld.SetPoolerDirForTest(poolerDir)
+				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				testutil.CreateDataDir(t, pgConfig.DataDir, true)
+				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
+				return poolerDir
 			},
 			setupBinaries: true,
 			mode:          "fast",
-			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
+			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
 				return config
 			},
 			expectError: false,
@@ -58,14 +62,17 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 		},
 		{
 			name: "successful stop with smart mode",
-			setupDataDir: func(baseDir string) string {
-				dataDir := testutil.CreateDataDir(t, baseDir, true)
-				testutil.CreatePIDFile(t, dataDir, 12345)
-				return dataDir
+			setupPoolerDir: func(baseDir string) string {
+				poolerDir := baseDir
+				pgctld.SetPoolerDirForTest(poolerDir)
+				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				testutil.CreateDataDir(t, pgConfig.DataDir, true)
+				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
+				return poolerDir
 			},
 			setupBinaries: true,
 			mode:          "smart",
-			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
+			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
 				return config
 			},
 			expectError: false,
@@ -76,14 +83,17 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 		},
 		{
 			name: "successful stop with immediate mode",
-			setupDataDir: func(baseDir string) string {
-				dataDir := testutil.CreateDataDir(t, baseDir, true)
-				testutil.CreatePIDFile(t, dataDir, 12345)
-				return dataDir
+			setupPoolerDir: func(baseDir string) string {
+				poolerDir := baseDir
+				pgctld.SetPoolerDirForTest(poolerDir)
+				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				testutil.CreateDataDir(t, pgConfig.DataDir, true)
+				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
+				return poolerDir
 			},
 			setupBinaries: true,
 			mode:          "immediate",
-			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
+			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
 				return config
 			},
 			expectError: false,
@@ -94,13 +104,17 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 		},
 		{
 			name: "stop when PostgreSQL is not running",
-			setupDataDir: func(baseDir string) string {
-				// Create data dir without PID file (not running)
-				return testutil.CreateDataDir(t, baseDir, true)
+			setupPoolerDir: func(baseDir string) string {
+				poolerDir := baseDir
+				pgctld.SetPoolerDirForTest(poolerDir)
+				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				testutil.CreateDataDir(t, pgConfig.DataDir, true)
+				// Don't create PID file (not running)
+				return poolerDir
 			},
 			setupBinaries: false,
 			mode:          "fast",
-			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
+			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
 				return config
 			},
 			expectError: false,
@@ -110,26 +124,31 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 			},
 		},
 		{
-			name:         "error when data-dir is empty",
-			setupDataDir: func(baseDir string) string { return "" },
-			mode:         "fast",
-			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
-				config.DataDir = ""
-				return config
+			name:           "error when data-dir is empty",
+			setupPoolerDir: func(baseDir string) string { return "" },
+			mode:           "fast",
+			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
+				// Create a new config with empty DataDir
+				emptyPgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				emptyPgConfig.DataDir = ""
+				return pgctld.NewPostgresCtlConfig(emptyPgConfig, "localhost", "postgres", "postgres", "", 30)
 			},
 			expectError:   true,
 			errorContains: "pg-data-dir is required",
 		},
 		{
 			name: "default mode when empty string provided",
-			setupDataDir: func(baseDir string) string {
-				dataDir := testutil.CreateDataDir(t, baseDir, true)
-				testutil.CreatePIDFile(t, dataDir, 12345)
-				return dataDir
+			setupPoolerDir: func(baseDir string) string {
+				poolerDir := baseDir
+				pgctld.SetPoolerDirForTest(poolerDir)
+				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				testutil.CreateDataDir(t, pgConfig.DataDir, true)
+				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
+				return poolerDir
 			},
 			setupBinaries: true,
 			mode:          "", // Empty mode should default to "fast"
-			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
+			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
 				return config
 			},
 			expectError: false,
@@ -145,7 +164,7 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 			baseDir, cleanup := testutil.TempDir(t, "pgctld_stop_test")
 			defer cleanup()
 
-			dataDir := tt.setupDataDir(baseDir)
+			tt.setupPoolerDir(baseDir)
 
 			if tt.setupBinaries {
 				binDir := filepath.Join(baseDir, "bin")
@@ -157,14 +176,11 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 				defer os.Setenv("PATH", originalPath)
 			}
 
-			config := &PostgresCtlConfig{
-				DataDir:  dataDir,
-				Host:     "localhost",
-				Port:     5432,
-				User:     "postgres",
-				Database: "postgres",
-				Timeout:  30,
-			}
+			// Create a mock PostgreSQL server config
+			pgConfig, err := pgctld.GeneratePostgresServerConfig("test", 5432)
+			require.NoError(t, err)
+
+			config := pgctld.NewPostgresCtlConfig(pgConfig, "localhost", "postgres", "postgres", "", 30)
 			config = tt.config(config)
 
 			result, err := StopPostgreSQLWithResult(config, tt.mode)
@@ -188,19 +204,22 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 
 func TestRunStop(t *testing.T) {
 	tests := []struct {
-		name          string
-		setupDataDir  func(string) string
-		setupBinaries bool
-		mode          string
-		expectError   bool
-		errorContains string
+		name           string
+		setupPoolerDir func(string) string
+		setupBinaries  bool
+		mode           string
+		expectError    bool
+		errorContains  string
 	}{
 		{
 			name: "successful stop command",
-			setupDataDir: func(baseDir string) string {
-				dataDir := testutil.CreateDataDir(t, baseDir, true)
-				testutil.CreatePIDFile(t, dataDir, 12345)
-				return dataDir
+			setupPoolerDir: func(baseDir string) string {
+				poolerDir := baseDir
+				pgctld.SetPoolerDirForTest(poolerDir)
+				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				testutil.CreateDataDir(t, pgConfig.DataDir, true)
+				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
+				return poolerDir
 			},
 			setupBinaries: true,
 			mode:          "fast",
@@ -208,8 +227,13 @@ func TestRunStop(t *testing.T) {
 		},
 		{
 			name: "stop when not running",
-			setupDataDir: func(baseDir string) string {
-				return testutil.CreateDataDir(t, baseDir, true)
+			setupPoolerDir: func(baseDir string) string {
+				poolerDir := baseDir
+				pgctld.SetPoolerDirForTest(poolerDir)
+				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				testutil.CreateDataDir(t, pgConfig.DataDir, true)
+				// Don't create PID file (not running)
+				return poolerDir
 			},
 			setupBinaries: false,
 			mode:          "fast",
@@ -217,10 +241,15 @@ func TestRunStop(t *testing.T) {
 		},
 		{
 			name: "stop with smart mode",
-			setupDataDir: func(baseDir string) string {
-				dataDir := testutil.CreateDataDir(t, baseDir, true)
-				testutil.CreatePIDFile(t, dataDir, 12345)
-				return dataDir
+			setupPoolerDir: func(baseDir string) string {
+				// This is to mock the case where the pooler dir was already set for testing
+				poolerDir := baseDir
+				cleanup := pgctld.SetPoolerDirForTest(poolerDir)
+				defer cleanup()
+				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				testutil.CreateDataDir(t, pgConfig.DataDir, true)
+				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
+				return poolerDir
 			},
 			setupBinaries: true,
 			mode:          "smart",
@@ -237,7 +266,7 @@ func TestRunStop(t *testing.T) {
 			cleanupViper := SetupTestPgCtldCleanup(t)
 			defer cleanupViper()
 
-			dataDir := tt.setupDataDir(baseDir)
+			poolerDir := tt.setupPoolerDir(baseDir)
 
 			if tt.setupBinaries {
 				binDir := filepath.Join(baseDir, "bin")
@@ -253,8 +282,8 @@ func TestRunStop(t *testing.T) {
 
 			// Set up the command arguments
 			args := []string{"stop", "--mode", tt.mode}
-			if dataDir != "" {
-				args = append(args, "--pg-data-dir", dataDir)
+			if poolerDir != "" {
+				args = append(args, "--pooler-dir", poolerDir)
 			}
 			cmd.SetArgs(args)
 
@@ -274,18 +303,23 @@ func TestRunStop(t *testing.T) {
 
 func TestStopPostgreSQLWithConfig(t *testing.T) {
 	tests := []struct {
-		name          string
-		setupDataDir  func(string) string
-		setupBinaries bool
-		mode          string
-		expectError   bool
+		name           string
+		setupPoolerDir func(string) string
+		setupBinaries  bool
+		mode           string
+		expectError    bool
 	}{
 		{
 			name: "successful stop via config wrapper",
-			setupDataDir: func(baseDir string) string {
-				dataDir := testutil.CreateDataDir(t, baseDir, true)
-				testutil.CreatePIDFile(t, dataDir, 12345)
-				return dataDir
+			setupPoolerDir: func(baseDir string) string {
+				// This is to mock the case where the pooler dir was already set for testing
+				poolerDir := baseDir
+				cleanup := pgctld.SetPoolerDirForTest(poolerDir)
+				defer cleanup()
+				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				testutil.CreateDataDir(t, pgConfig.DataDir, true)
+				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
+				return poolerDir
 			},
 			setupBinaries: true,
 			mode:          "fast",
@@ -293,8 +327,15 @@ func TestStopPostgreSQLWithConfig(t *testing.T) {
 		},
 		{
 			name: "stop when not running via config wrapper",
-			setupDataDir: func(baseDir string) string {
-				return testutil.CreateDataDir(t, baseDir, true)
+			setupPoolerDir: func(baseDir string) string {
+				// This is to mock the case where the pooler dir was already set for testing
+				poolerDir := baseDir
+				cleanup := pgctld.SetPoolerDirForTest(poolerDir)
+				defer cleanup()
+				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				testutil.CreateDataDir(t, pgConfig.DataDir, true)
+				// Don't create PID file (not running)
+				return poolerDir
 			},
 			setupBinaries: false,
 			mode:          "fast",
@@ -307,7 +348,7 @@ func TestStopPostgreSQLWithConfig(t *testing.T) {
 			baseDir, cleanup := testutil.TempDir(t, "pgctld_stop_config_test")
 			defer cleanup()
 
-			dataDir := tt.setupDataDir(baseDir)
+			tt.setupPoolerDir(baseDir)
 
 			if tt.setupBinaries {
 				binDir := filepath.Join(baseDir, "bin")
@@ -319,16 +360,13 @@ func TestStopPostgreSQLWithConfig(t *testing.T) {
 				defer os.Setenv("PATH", originalPath)
 			}
 
-			config := &PostgresCtlConfig{
-				DataDir:  dataDir,
-				Host:     "localhost",
-				Port:     5432,
-				User:     "postgres",
-				Database: "postgres",
-				Timeout:  30,
-			}
+			// Create a mock PostgreSQL server config
+			pgConfig, err := pgctld.GeneratePostgresServerConfig("test", 5432)
+			require.NoError(t, err)
 
-			err := StopPostgreSQLWithConfig(config, tt.mode)
+			config := pgctld.NewPostgresCtlConfig(pgConfig, "localhost", "postgres", "postgres", "", 30)
+
+			err = StopPostgreSQLWithConfig(config, tt.mode)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -343,44 +381,38 @@ func TestTakeCheckpoint(t *testing.T) {
 	tests := []struct {
 		name          string
 		setupBinaries bool
-		config        *PostgresCtlConfig
+		config        *pgctld.PostgresCtlConfig
 		expectError   bool
 		errorContains string
 	}{
 		{
 			name:          "successful checkpoint",
 			setupBinaries: true,
-			config: &PostgresCtlConfig{
-				Host:     "localhost",
-				Port:     5432,
-				User:     "postgres",
-				Database: "postgres",
-				DataDir:  "/tmp/test",
-			},
+			config: func() *pgctld.PostgresCtlConfig {
+				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
+				pgConfig.DataDir = "/tmp/test"
+				return pgctld.NewPostgresCtlConfig(pgConfig, "localhost", "postgres", "postgres", "", 30)
+			}(),
 			expectError: false,
 		},
 		{
 			name:          "checkpoint with password",
 			setupBinaries: true,
-			config: &PostgresCtlConfig{
+			config: &pgctld.PostgresCtlConfig{
 				Host:     "localhost",
-				Port:     5432,
 				User:     "postgres",
 				Database: "postgres",
 				Password: "secret",
-				DataDir:  "/tmp/test",
 			},
 			expectError: false,
 		},
 		{
 			name:          "checkpoint failure - psql command fails",
 			setupBinaries: true, // Create failing psql binary
-			config: &PostgresCtlConfig{
+			config: &pgctld.PostgresCtlConfig{
 				Host:     "localhost",
-				Port:     5432,
 				User:     "postgres",
 				Database: "postgres",
-				DataDir:  "/tmp/test",
 			},
 			expectError:   true,
 			errorContains: "checkpoint command failed",

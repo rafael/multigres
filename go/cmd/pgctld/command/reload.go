@@ -23,6 +23,8 @@ import (
 	"os/exec"
 	"syscall"
 
+	"github.com/multigres/multigres/go/pgctld"
+
 	"github.com/spf13/cobra"
 )
 
@@ -59,25 +61,25 @@ Examples:
 }
 
 // ReloadPostgreSQLConfigWithResult reloads PostgreSQL configuration and returns detailed result information
-func ReloadPostgreSQLConfigWithResult(config *PostgresCtlConfig) (*ReloadResult, error) {
+func ReloadPostgreSQLConfigWithResult(config *pgctld.PostgresCtlConfig) (*ReloadResult, error) {
 	logger := slog.Default()
 	result := &ReloadResult{}
 
-	if config.DataDir == "" {
+	if config.DataDir() == "" {
 		return nil, fmt.Errorf("data-dir is required")
 	}
 
 	// Check if PostgreSQL is running
-	if !isPostgreSQLRunning(config.DataDir) {
+	if !isPostgreSQLRunning(config.DataDir()) {
 		result.WasRunning = false
 		result.Message = "PostgreSQL is not running"
 		return result, fmt.Errorf("PostgreSQL is not running")
 	}
 
 	result.WasRunning = true
-	logger.Info("Reloading PostgreSQL configuration", "data_dir", config.DataDir)
+	logger.Info("Reloading PostgreSQL configuration", "data_dir", config.DataDir())
 
-	if err := reloadPostgreSQLConfig(config.DataDir); err != nil {
+	if err := reloadPostgreSQLConfig(config.DataDir()); err != nil {
 		return nil, fmt.Errorf("failed to reload PostgreSQL configuration: %w", err)
 	}
 
@@ -87,7 +89,10 @@ func ReloadPostgreSQLConfigWithResult(config *PostgresCtlConfig) (*ReloadResult,
 }
 
 func runReload(cmd *cobra.Command, args []string) error {
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
 
 	result, err := ReloadPostgreSQLConfigWithResult(config)
 	if err != nil {

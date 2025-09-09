@@ -17,6 +17,9 @@ limitations under the License.
 package command
 
 import (
+	"fmt"
+
+	"github.com/multigres/multigres/go/pgctld"
 	"github.com/multigres/multigres/go/servenv"
 
 	"github.com/spf13/cobra"
@@ -35,6 +38,22 @@ var (
 	timeout      = 30
 )
 
+// validateGlobalFlags validates required global flags for all pgctld commands
+func validateGlobalFlags(cmd *cobra.Command, args []string) error {
+	// First run the standard servenv validation
+	if err := servenv.CobraPreRunE(cmd, args); err != nil {
+		return err
+	}
+
+	// Validate pooler-dir is required and non-empty for all commands
+	poolerDir := pgctld.GetPoolerDir()
+	if poolerDir == "" {
+		return fmt.Errorf("--pooler-dir is required and cannot be empty")
+	}
+
+	return nil
+}
+
 // Root represents the base command when called without any subcommands
 var Root = &cobra.Command{
 	Use:   "pgctld",
@@ -43,7 +62,7 @@ var Root = &cobra.Command{
 It provides lifecycle management including start, stop, restart, and configuration
 management for PostgreSQL servers.`,
 	Args:    cobra.NoArgs,
-	PreRunE: servenv.CobraPreRunE,
+	PreRunE: validateGlobalFlags,
 }
 
 func init() {

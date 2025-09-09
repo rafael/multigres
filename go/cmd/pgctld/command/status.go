@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/multigres/multigres/go/pgctld"
+
 	"github.com/spf13/cobra"
 )
 
@@ -73,27 +75,27 @@ Examples:
 }
 
 // GetStatusWithResult gets PostgreSQL status with the given configuration and returns detailed result information
-func GetStatusWithResult(config *PostgresCtlConfig) (*StatusResult, error) {
+func GetStatusWithResult(config *pgctld.PostgresCtlConfig) (*StatusResult, error) {
 	logger := slog.Default()
 	result := &StatusResult{
-		DataDir: config.DataDir,
-		Port:    config.Port,
+		DataDir: config.DataDir(),
+		Port:    config.Port(),
 		Host:    config.Host,
 	}
 
-	if config.DataDir == "" {
+	if config.DataDir() == "" {
 		return nil, fmt.Errorf("pg-data-dir is required")
 	}
 
 	// Check if data directory is initialized
-	if !isDataDirInitialized(config.DataDir) {
+	if !isDataDirInitialized(config.DataDir()) {
 		result.Status = "NOT_INITIALIZED"
 		result.Message = "Data directory is not initialized"
 		return result, nil
 	}
 
 	// Check if PostgreSQL is running
-	if !isPostgreSQLRunning(config.DataDir) {
+	if !isPostgreSQLRunning(config.DataDir()) {
 		result.Status = "STOPPED"
 		result.Message = "PostgreSQL server is stopped"
 		return result, nil
@@ -104,7 +106,7 @@ func GetStatusWithResult(config *PostgresCtlConfig) (*StatusResult, error) {
 	result.Message = "PostgreSQL server is running"
 
 	// Get PID if running
-	if pid, err := readPostmasterPID(config.DataDir); err == nil {
+	if pid, err := readPostmasterPID(config.DataDir()); err == nil {
 		result.PID = pid
 	} else {
 		logger.Warn("Could not read postmaster PID", "error", err)
@@ -117,7 +119,7 @@ func GetStatusWithResult(config *PostgresCtlConfig) (*StatusResult, error) {
 	result.Version = getServerVersionWithConfig(config)
 
 	// Get uptime (approximate based on pidfile mtime)
-	pidFile := filepath.Join(config.DataDir, "postmaster.pid")
+	pidFile := filepath.Join(config.DataDir(), "postmaster.pid")
 	if stat, err := os.Stat(pidFile); err == nil {
 		result.UptimeSeconds = int64(time.Since(stat.ModTime()).Seconds())
 	}
@@ -126,7 +128,10 @@ func GetStatusWithResult(config *PostgresCtlConfig) (*StatusResult, error) {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
 	// No local flag overrides needed - all flags are global now
 
 	result, err := GetStatusWithResult(config)
@@ -195,14 +200,18 @@ func formatUptime(seconds int64) string {
 }
 
 func isServerReady() bool {
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		slog.Warn("Failed to create config for server ready check", "error", err)
+		return false
+	}
 	return isServerReadyWithConfig(config)
 }
 
-func isServerReadyWithConfig(config *PostgresCtlConfig) bool {
+func isServerReadyWithConfig(config *pgctld.PostgresCtlConfig) bool {
 	cmd := exec.Command("pg_isready",
 		"-h", config.Host,
-		"-p", fmt.Sprintf("%d", config.Port),
+		"-p", fmt.Sprintf("%d", config.Port()),
 		"-U", config.User,
 		"-d", config.Database,
 	)
@@ -211,14 +220,18 @@ func isServerReadyWithConfig(config *PostgresCtlConfig) bool {
 }
 
 func getServerVersion() string {
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		slog.Warn("Failed to create config for version check", "error", err)
+		return "unknown"
+	}
 	return getServerVersionWithConfig(config)
 }
 
-func getServerVersionWithConfig(config *PostgresCtlConfig) string {
+func getServerVersionWithConfig(config *pgctld.PostgresCtlConfig) string {
 	cmd := exec.Command("psql",
 		"-h", config.Host,
-		"-p", fmt.Sprintf("%d", config.Port),
+		"-p", fmt.Sprintf("%d", config.Port()),
 		"-U", config.User,
 		"-d", config.Database,
 		"-t", "-c", "SELECT version()",

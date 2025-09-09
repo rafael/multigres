@@ -1,24 +1,24 @@
-/*
-Copyright 2025 The Multigres Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2025 The Multigres Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package command
 
 import (
 	"fmt"
 	"log/slog"
+
+	"github.com/multigres/multigres/go/pgctld"
 
 	"github.com/spf13/cobra"
 )
@@ -48,10 +48,10 @@ file and environment variable settings.
 
 Examples:
   # Initialize data directory
-  pgctld init --pg-data-dir /var/lib/postgresql/data
+  pgctld init --pooler-dir /var/lib/pooler-dir
 
   # Initialize with existing configuration
-  pgctld init -d /var/lib/postgresql/instance2/data
+  pgctld init -d /var/lib/pooler-dir
 
   # Initialize using config file settings
   pgctld init --config-file /etc/pgctld/config.yaml`,
@@ -59,24 +59,20 @@ Examples:
 }
 
 // InitDataDirWithResult initializes PostgreSQL data directory and returns detailed result information
-func InitDataDirWithResult(config *PostgresCtlConfig) (*InitResult, error) {
+func InitDataDirWithResult(serverConfig *pgctld.PostgresServerConfig) (*InitResult, error) {
 	logger := slog.Default()
 	result := &InitResult{}
 
-	if config.DataDir == "" {
-		return nil, fmt.Errorf("pg-data-dir is required")
-	}
-
 	// Check if data directory is already initialized
-	if isDataDirInitialized(config.DataDir) {
-		logger.Info("Data directory is already initialized", "data_dir", config.DataDir)
+	if isDataDirInitialized(serverConfig.DataDir) {
+		logger.Info("Data directory is already initialized", "data_dir", serverConfig.DataDir)
 		result.AlreadyInitialized = true
 		result.Message = "Data directory is already initialized"
 		return result, nil
 	}
 
-	logger.Info("Initializing PostgreSQL data directory", "data_dir", config.DataDir)
-	if err := initializeDataDir(config.DataDir); err != nil {
+	logger.Info("Initializing PostgreSQL data directory", "data_dir", serverConfig.DataDir)
+	if err := initializeDataDir(serverConfig.DataDir); err != nil {
 		return nil, fmt.Errorf("failed to initialize data directory: %w", err)
 	}
 
@@ -87,18 +83,22 @@ func InitDataDirWithResult(config *PostgresCtlConfig) (*InitResult, error) {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	config := NewPostgresCtlConfigFromDefaults()
+	// Load or create server config using the pooler directory
+	serverConfig, err := pgctld.LoadOrCreatePostgresServerConfig("test", 5432)
+	if err != nil {
+		return fmt.Errorf("failed to create postgres config: %w", err)
+	}
 
-	result, err := InitDataDirWithResult(config)
+	result, err := InitDataDirWithResult(serverConfig)
 	if err != nil {
 		return err
 	}
 
 	// Display appropriate message for CLI users
 	if result.AlreadyInitialized {
-		fmt.Printf("Data directory is already initialized: %s\n", config.DataDir)
+		fmt.Printf("Data directory is already initialized: %s\n", serverConfig.DataDir)
 	} else {
-		fmt.Printf("Data directory initialized successfully: %s\n", config.DataDir)
+		fmt.Printf("Data directory initialized successfully: %s\n", serverConfig.DataDir)
 	}
 
 	return nil

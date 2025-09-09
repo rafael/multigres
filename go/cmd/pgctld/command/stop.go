@@ -22,6 +22,8 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/multigres/multigres/go/pgctld"
+
 	"github.com/spf13/cobra"
 )
 
@@ -66,7 +68,10 @@ Examples:
 }
 
 func runStop(cmd *cobra.Command, args []string) error {
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		return fmt.Errorf("failed to create config: %w", err)
+	}
 	mode, _ := cmd.Flags().GetString("mode")
 
 	// No local flag overrides needed - all flags are global now
@@ -87,11 +92,11 @@ func runStop(cmd *cobra.Command, args []string) error {
 }
 
 // StopPostgreSQLWithResult stops PostgreSQL with the given configuration and returns detailed result information
-func StopPostgreSQLWithResult(config *PostgresCtlConfig, mode string) (*StopResult, error) {
+func StopPostgreSQLWithResult(config *pgctld.PostgresCtlConfig, mode string) (*StopResult, error) {
 	logger := slog.Default()
 	result := &StopResult{}
 
-	if config.DataDir == "" {
+	if config.DataDir() == "" {
 		return nil, fmt.Errorf("pg-data-dir is required")
 	}
 
@@ -101,7 +106,7 @@ func StopPostgreSQLWithResult(config *PostgresCtlConfig, mode string) (*StopResu
 	}
 
 	// Check if PostgreSQL is running
-	if !isPostgreSQLRunning(config.DataDir) {
+	if !isPostgreSQLRunning(config.DataDir()) {
 		logger.Info("PostgreSQL is not running")
 		result.WasRunning = false
 		result.Message = "PostgreSQL is not running"
@@ -109,7 +114,7 @@ func StopPostgreSQLWithResult(config *PostgresCtlConfig, mode string) (*StopResu
 	}
 
 	result.WasRunning = true
-	logger.Info("Stopping PostgreSQL server", "data_dir", config.DataDir, "mode", mode)
+	logger.Info("Stopping PostgreSQL server", "data_dir", config.DataDir(), "mode", mode)
 
 	if err := stopPostgreSQLWithConfig(config, mode); err != nil {
 		return nil, fmt.Errorf("failed to stop PostgreSQL: %w", err)
@@ -121,7 +126,7 @@ func StopPostgreSQLWithResult(config *PostgresCtlConfig, mode string) (*StopResu
 }
 
 // StopPostgreSQLWithConfig stops PostgreSQL with the given configuration and mode
-func StopPostgreSQLWithConfig(config *PostgresCtlConfig, mode string) error {
+func StopPostgreSQLWithConfig(config *pgctld.PostgresCtlConfig, mode string) error {
 	result, err := StopPostgreSQLWithResult(config, mode)
 	if err != nil {
 		return err
@@ -135,7 +140,7 @@ func StopPostgreSQLWithConfig(config *PostgresCtlConfig, mode string) error {
 	return nil
 }
 
-func stopPostgreSQLWithConfig(config *PostgresCtlConfig, mode string) error {
+func stopPostgreSQLWithConfig(config *pgctld.PostgresCtlConfig, mode string) error {
 	// First try using pg_ctl
 	if err := stopWithPgCtlWithConfig(config, mode); err != nil {
 		slog.Error("pg_ctl stop failed,", "error", err)
@@ -144,16 +149,16 @@ func stopPostgreSQLWithConfig(config *PostgresCtlConfig, mode string) error {
 	return nil
 }
 
-func stopWithPgCtlWithConfig(config *PostgresCtlConfig, mode string) error {
+func stopWithPgCtlWithConfig(config *pgctld.PostgresCtlConfig, mode string) error {
 	// Take a checkpoint before stopping PostgreSQL for clean shutdown
 	if err := takeCheckpoint(config); err != nil {
-		slog.Warn("Failed to take checkpoint before stop", "error", err, "data_dir", config.DataDir)
+		slog.Warn("Failed to take checkpoint before stop", "error", err, "data_dir", config.DataDir())
 		// Continue with stop even if checkpoint fails - it's not critical
 	}
 
 	args := []string{
 		"stop",
-		"-D", config.DataDir,
+		"-D", config.DataDir(),
 		"-m", mode,
 		"-t", fmt.Sprintf("%d", config.Timeout),
 	}
@@ -166,13 +171,13 @@ func stopWithPgCtlWithConfig(config *PostgresCtlConfig, mode string) error {
 }
 
 // takeCheckpoint executes a CHECKPOINT command to ensure all data is written to disk before shutdown
-func takeCheckpoint(config *PostgresCtlConfig) error {
-	slog.Info("Taking checkpoint before stopping PostgreSQL", "data_dir", config.DataDir)
+func takeCheckpoint(config *pgctld.PostgresCtlConfig) error {
+	slog.Info("Taking checkpoint before stopping PostgreSQL", "data_dir", config.DataDir())
 
 	// Use psql to connect and execute CHECKPOINT
 	args := []string{
 		"-h", config.Host,
-		"-p", fmt.Sprintf("%d", config.Port),
+		"-p", fmt.Sprintf("%d", config.Port()),
 		"-U", config.User,
 		"-d", config.Database,
 		"-c", "CHECKPOINT;",
@@ -193,6 +198,6 @@ func takeCheckpoint(config *PostgresCtlConfig) error {
 		return fmt.Errorf("checkpoint command failed: %w, output: %s", err, string(output))
 	}
 
-	slog.Info("Checkpoint completed successfully", "data_dir", config.DataDir)
+	slog.Info("Checkpoint completed successfully", "data_dir", config.DataDir())
 	return nil
 }

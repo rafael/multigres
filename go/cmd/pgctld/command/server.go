@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/multigres/multigres/go/pgctld"
 	"github.com/multigres/multigres/go/servenv"
 
 	"github.com/spf13/cobra"
@@ -80,10 +81,13 @@ type PgCtldService struct {
 }
 
 func (s *PgCtldService) Start(ctx context.Context, req *pb.StartRequest) (*pb.StartResponse, error) {
-	s.logger.Info("gRPC Start request", "data_dir", req.DataDir, "port", req.Port)
+	s.logger.Info("gRPC Start request", "port", req.Port)
 
 	// Create config from request parameters
-	config := NewPostgresConfigFromStartRequest(req)
+	config, err := NewPostgresConfigFromStartRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
 
 	// Use the shared start function with detailed result
 	result, err := StartPostgreSQLWithResult(config)
@@ -98,10 +102,13 @@ func (s *PgCtldService) Start(ctx context.Context, req *pb.StartRequest) (*pb.St
 }
 
 func (s *PgCtldService) Stop(ctx context.Context, req *pb.StopRequest) (*pb.StopResponse, error) {
-	s.logger.Info("gRPC Stop request", "data_dir", req.DataDir, "mode", req.Mode)
+	s.logger.Info("gRPC Stop request", "mode", req.Mode)
 
 	// Create config from request parameters
-	config := NewPostgresConfigFromStopRequest(req)
+	config, err := NewPostgresConfigFromStopRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
 
 	// Use the shared stop function with detailed result
 	result, err := StopPostgreSQLWithResult(config, req.Mode)
@@ -115,25 +122,26 @@ func (s *PgCtldService) Stop(ctx context.Context, req *pb.StopRequest) (*pb.Stop
 }
 
 func (s *PgCtldService) Restart(ctx context.Context, req *pb.RestartRequest) (*pb.RestartResponse, error) {
-	s.logger.Info("gRPC Restart request", "data_dir", req.DataDir, "mode", req.Mode)
+	s.logger.Info("gRPC Restart request", "mode", req.Mode, "port", req.Port)
 
-	// Create config from request parameters
-	config := NewPostgresCtlConfigFromDefaults()
-	if req.DataDir != "" {
-		config.DataDir = req.DataDir
-	}
+	// Determine the port to use
+	port := pgPort
 	if req.Port > 0 {
-		config.Port = int(req.Port)
+		port = int(req.Port)
 	}
-	if req.SocketDir != "" {
-		config.SocketDir = req.SocketDir
+
+	// Load or create PostgreSQL server config
+	pgConfig, err := pgctld.LoadOrCreatePostgresServerConfig("default", port)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load postgres config: %w", err)
 	}
-	if req.ConfigFile != "" {
-		config.ConfigFile = req.ConfigFile
-	}
+
+	timeout := timeout
 	if req.Timeout > 0 {
-		config.Timeout = int(req.Timeout)
+		timeout = int(req.Timeout)
 	}
+
+	config := pgctld.NewPostgresCtlConfig(pgConfig, pgHost, pgUser, pgDatabase, pgPassword, timeout)
 
 	// Use the shared restart function with detailed result
 	result, err := RestartPostgreSQLWithResult(config, req.Mode)
@@ -148,12 +156,12 @@ func (s *PgCtldService) Restart(ctx context.Context, req *pb.RestartRequest) (*p
 }
 
 func (s *PgCtldService) ReloadConfig(ctx context.Context, req *pb.ReloadConfigRequest) (*pb.ReloadConfigResponse, error) {
-	s.logger.Info("gRPC ReloadConfig request", "data_dir", req.DataDir)
+	s.logger.Info("gRPC ReloadConfig request")
 
 	// Create config from request parameters
-	config := NewPostgresCtlConfigFromDefaults()
-	if req.DataDir != "" {
-		config.DataDir = req.DataDir
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 
 	// Use the shared reload function with detailed result
@@ -168,10 +176,13 @@ func (s *PgCtldService) ReloadConfig(ctx context.Context, req *pb.ReloadConfigRe
 }
 
 func (s *PgCtldService) Status(ctx context.Context, req *pb.StatusRequest) (*pb.StatusResponse, error) {
-	s.logger.Debug("gRPC Status request", "data_dir", req.DataDir)
+	s.logger.Debug("gRPC Status request")
 
 	// Create config from request parameters
-	config := NewPostgresConfigFromStatusRequest(req)
+	config, err := NewPostgresConfigFromStatusRequest(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
 
 	// Use the shared status function with detailed result
 	result, err := GetStatusWithResult(config)
@@ -208,15 +219,31 @@ func (s *PgCtldService) Status(ctx context.Context, req *pb.StatusRequest) (*pb.
 func (s *PgCtldService) Version(ctx context.Context, req *pb.VersionRequest) (*pb.VersionResponse, error) {
 	s.logger.Debug("gRPC Version request")
 
-	// Create config from base viper settings
-	config := NewPostgresCtlConfigFromDefaults()
+	// Determine the port to use
+	port := pgPort
+	if req.Port > 0 {
+		port = int(req.Port)
+	}
+
+	// Load or create PostgreSQL server config
+	pgConfig, err := pgctld.LoadOrCreatePostgresServerConfig("default", port)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load postgres config: %w", err)
+	}
+
+	// Create config with overrides from request
+	config := &pgctld.PostgresCtlConfig{
+		PostgresConfig: pgConfig,
+		Host:           pgHost,
+		User:           pgUser,
+		Database:       pgDatabase,
+		Password:       pgPassword,
+		Timeout:        timeout,
+	}
 
 	// Override with request parameters if provided
 	if req.Host != "" {
 		config.Host = req.Host
-	}
-	if req.Port > 0 {
-		config.Port = int(req.Port)
 	}
 	if req.Database != "" {
 		config.Database = req.Database
@@ -238,12 +265,12 @@ func (s *PgCtldService) Version(ctx context.Context, req *pb.VersionRequest) (*p
 }
 
 func (s *PgCtldService) InitDataDir(ctx context.Context, req *pb.InitDataDirRequest) (*pb.InitDataDirResponse, error) {
-	s.logger.Info("gRPC InitDataDir request", "data_dir", req.DataDir)
+	s.logger.Info("gRPC InitDataDir request")
 
 	// Create config from request parameters
-	config := NewPostgresCtlConfigFromDefaults()
-	if req.DataDir != "" {
-		config.DataDir = req.DataDir
+	config, err := pgctld.LoadOrCreatePostgresServerConfig("default", pgPort)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load or create PostgresServerConfig: %w", err)
 	}
 
 	// Use the shared init function with detailed result
