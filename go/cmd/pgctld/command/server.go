@@ -118,7 +118,7 @@ func (s *PgCtldService) Restart(ctx context.Context, req *pb.RestartRequest) (*p
 	s.logger.Info("gRPC Restart request", "data_dir", req.DataDir, "mode", req.Mode)
 
 	// Create config from request parameters
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 	if req.DataDir != "" {
 		config.DataDir = req.DataDir
 	}
@@ -151,7 +151,7 @@ func (s *PgCtldService) ReloadConfig(ctx context.Context, req *pb.ReloadConfigRe
 	s.logger.Info("gRPC ReloadConfig request", "data_dir", req.DataDir)
 
 	// Create config from request parameters
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 	if req.DataDir != "" {
 		config.DataDir = req.DataDir
 	}
@@ -209,7 +209,7 @@ func (s *PgCtldService) Version(ctx context.Context, req *pb.VersionRequest) (*p
 	s.logger.Debug("gRPC Version request")
 
 	// Create config from base viper settings
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 
 	// Override with request parameters if provided
 	if req.Host != "" {
@@ -241,7 +241,7 @@ func (s *PgCtldService) InitDataDir(ctx context.Context, req *pb.InitDataDirRequ
 	s.logger.Info("gRPC InitDataDir request", "data_dir", req.DataDir)
 
 	// Create config from request parameters
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 	if req.DataDir != "" {
 		config.DataDir = req.DataDir
 	}

@@ -62,7 +62,7 @@ Examples:
 }
 
 // RestartPostgreSQLWithResult restarts PostgreSQL with the given configuration and returns detailed result information
-func RestartPostgreSQLWithResult(config *PostgresConfig, mode string) (*RestartResult, error) {
+func RestartPostgreSQLWithResult(config *PostgresCtlConfig, mode string) (*RestartResult, error) {
 	logger := slog.Default()
 	result := &RestartResult{}
 
@@ -100,7 +100,7 @@ func RestartPostgreSQLWithResult(config *PostgresConfig, mode string) (*RestartR
 }
 
 func runRestart(cmd *cobra.Command, args []string) error {
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 	mode, _ := cmd.Flags().GetString("mode")
 
 	// Override with command-specific flags if provided

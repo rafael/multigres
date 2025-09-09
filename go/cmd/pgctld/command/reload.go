@@ -59,7 +59,7 @@ Examples:
 }
 
 // ReloadPostgreSQLConfigWithResult reloads PostgreSQL configuration and returns detailed result information
-func ReloadPostgreSQLConfigWithResult(config *PostgresConfig) (*ReloadResult, error) {
+func ReloadPostgreSQLConfigWithResult(config *PostgresCtlConfig) (*ReloadResult, error) {
 	logger := slog.Default()
 	result := &ReloadResult{}
 
@@ -87,7 +87,7 @@ func ReloadPostgreSQLConfigWithResult(config *PostgresConfig) (*ReloadResult, er
 }
 
 func runReload(cmd *cobra.Command, args []string) error {
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 
 	result, err := ReloadPostgreSQLConfigWithResult(config)
 	if err != nil {

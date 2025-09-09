@@ -73,7 +73,7 @@ Examples:
 }
 
 // GetStatusWithResult gets PostgreSQL status with the given configuration and returns detailed result information
-func GetStatusWithResult(config *PostgresConfig) (*StatusResult, error) {
+func GetStatusWithResult(config *PostgresCtlConfig) (*StatusResult, error) {
 	logger := slog.Default()
 	result := &StatusResult{
 		DataDir: config.DataDir,
@@ -126,7 +126,7 @@ func GetStatusWithResult(config *PostgresConfig) (*StatusResult, error) {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 	// No local flag overrides needed - all flags are global now
 
 	result, err := GetStatusWithResult(config)
@@ -195,11 +195,11 @@ func formatUptime(seconds int64) string {
 }
 
 func isServerReady() bool {
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 	return isServerReadyWithConfig(config)
 }
 
-func isServerReadyWithConfig(config *PostgresConfig) bool {
+func isServerReadyWithConfig(config *PostgresCtlConfig) bool {
 	cmd := exec.Command("pg_isready",
 		"-h", config.Host,
 		"-p", fmt.Sprintf("%d", config.Port),
@@ -211,11 +211,11 @@ func isServerReadyWithConfig(config *PostgresConfig) bool {
 }
 
 func getServerVersion() string {
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 	return getServerVersionWithConfig(config)
 }
 
-func getServerVersionWithConfig(config *PostgresConfig) string {
+func getServerVersionWithConfig(config *PostgresCtlConfig) string {
 	cmd := exec.Command("psql",
 		"-h", config.Host,
 		"-p", fmt.Sprintf("%d", config.Port),

@@ -59,7 +59,7 @@ Examples:
 }
 
 // InitDataDirWithResult initializes PostgreSQL data directory and returns detailed result information
-func InitDataDirWithResult(config *PostgresConfig) (*InitResult, error) {
+func InitDataDirWithResult(config *PostgresCtlConfig) (*InitResult, error) {
 	logger := slog.Default()
 	result := &InitResult{}
 
@@ -87,7 +87,7 @@ func InitDataDirWithResult(config *PostgresConfig) (*InitResult, error) {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 
 	result, err := InitDataDirWithResult(config)
 	if err != nil {

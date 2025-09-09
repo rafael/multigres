@@ -33,7 +33,7 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 		setupDataDir   func(string) string
 		setupBinaries  bool
 		mode           string
-		config         func(*PostgresConfig) *PostgresConfig
+		config         func(*PostgresCtlConfig) *PostgresCtlConfig
 		expectError    bool
 		errorContains  string
 		expectedResult func(*StopResult)
@@ -47,7 +47,7 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 			},
 			setupBinaries: true,
 			mode:          "fast",
-			config: func(config *PostgresConfig) *PostgresConfig {
+			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
 				return config
 			},
 			expectError: false,
@@ -65,7 +65,7 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 			},
 			setupBinaries: true,
 			mode:          "smart",
-			config: func(config *PostgresConfig) *PostgresConfig {
+			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
 				return config
 			},
 			expectError: false,
@@ -83,7 +83,7 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 			},
 			setupBinaries: true,
 			mode:          "immediate",
-			config: func(config *PostgresConfig) *PostgresConfig {
+			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
 				return config
 			},
 			expectError: false,
@@ -100,7 +100,7 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 			},
 			setupBinaries: false,
 			mode:          "fast",
-			config: func(config *PostgresConfig) *PostgresConfig {
+			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
 				return config
 			},
 			expectError: false,
@@ -113,7 +113,7 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 			name:         "error when data-dir is empty",
 			setupDataDir: func(baseDir string) string { return "" },
 			mode:         "fast",
-			config: func(config *PostgresConfig) *PostgresConfig {
+			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
 				config.DataDir = ""
 				return config
 			},
@@ -129,7 +129,7 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 			},
 			setupBinaries: true,
 			mode:          "", // Empty mode should default to "fast"
-			config: func(config *PostgresConfig) *PostgresConfig {
+			config: func(config *PostgresCtlConfig) *PostgresCtlConfig {
 				return config
 			},
 			expectError: false,
@@ -157,7 +157,7 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 				defer os.Setenv("PATH", originalPath)
 			}
 
-			config := &PostgresConfig{
+			config := &PostgresCtlConfig{
 				DataDir:  dataDir,
 				Host:     "localhost",
 				Port:     5432,
@@ -319,7 +319,7 @@ func TestStopPostgreSQLWithConfig(t *testing.T) {
 				defer os.Setenv("PATH", originalPath)
 			}
 
-			config := &PostgresConfig{
+			config := &PostgresCtlConfig{
 				DataDir:  dataDir,
 				Host:     "localhost",
 				Port:     5432,
@@ -343,14 +343,14 @@ func TestTakeCheckpoint(t *testing.T) {
 	tests := []struct {
 		name          string
 		setupBinaries bool
-		config        *PostgresConfig
+		config        *PostgresCtlConfig
 		expectError   bool
 		errorContains string
 	}{
 		{
 			name:          "successful checkpoint",
 			setupBinaries: true,
-			config: &PostgresConfig{
+			config: &PostgresCtlConfig{
 				Host:     "localhost",
 				Port:     5432,
 				User:     "postgres",
@@ -362,7 +362,7 @@ func TestTakeCheckpoint(t *testing.T) {
 		{
 			name:          "checkpoint with password",
 			setupBinaries: true,
-			config: &PostgresConfig{
+			config: &PostgresCtlConfig{
 				Host:     "localhost",
 				Port:     5432,
 				User:     "postgres",
@@ -375,7 +375,7 @@ func TestTakeCheckpoint(t *testing.T) {
 		{
 			name:          "checkpoint failure - psql command fails",
 			setupBinaries: true, // Create failing psql binary
-			config: &PostgresConfig{
+			config: &PostgresCtlConfig{
 				Host:     "localhost",
 				Port:     5432,
 				User:     "postgres",

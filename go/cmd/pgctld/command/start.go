@@ -40,8 +40,8 @@ type StartResult struct {
 	WasInitialized bool
 }
 
-// PostgresConfig holds all PostgreSQL configuration parameters
-type PostgresConfig struct {
+// PostgresCtlConfig holds all PostgreSQL configuration parameters
+type PostgresCtlConfig struct {
 	DataDir    string
 	Port       int
 	Host       string
@@ -53,9 +53,9 @@ type PostgresConfig struct {
 	Timeout    int
 }
 
-// NewPostgresConfigFromDefaults creates a PostgresConfig with default values and viper fallbacks
-func NewPostgresConfigFromDefaults() *PostgresConfig {
-	return &PostgresConfig{
+// NewPostgresCtlConfigFromDefaults creates a PostgresCtlConfig with default values and viper fallbacks
+func NewPostgresCtlConfigFromDefaults() *PostgresCtlConfig {
+	return &PostgresCtlConfig{
 		DataDir:    pgDataDir,
 		Port:       pgPort,
 		Host:       pgHost,
@@ -68,9 +68,9 @@ func NewPostgresConfigFromDefaults() *PostgresConfig {
 	}
 }
 
-// NewPostgresConfigFromStartRequest creates a PostgresConfig from a gRPC StartRequest
-func NewPostgresConfigFromStartRequest(req *pb.StartRequest) *PostgresConfig {
-	config := NewPostgresConfigFromDefaults()
+// NewPostgresConfigFromStartRequest creates a PostgresCtlConfig from a gRPC StartRequest
+func NewPostgresConfigFromStartRequest(req *pb.StartRequest) *PostgresCtlConfig {
+	config := NewPostgresCtlConfigFromDefaults()
 
 	// Override with request parameters if provided
 	if req.DataDir != "" {
@@ -89,9 +89,9 @@ func NewPostgresConfigFromStartRequest(req *pb.StartRequest) *PostgresConfig {
 	return config
 }
 
-// NewPostgresConfigFromStopRequest creates a PostgresConfig from a gRPC StopRequest
-func NewPostgresConfigFromStopRequest(req *pb.StopRequest) *PostgresConfig {
-	config := NewPostgresConfigFromDefaults()
+// NewPostgresConfigFromStopRequest creates a PostgresCtlConfig from a gRPC StopRequest
+func NewPostgresConfigFromStopRequest(req *pb.StopRequest) *PostgresCtlConfig {
+	config := NewPostgresCtlConfigFromDefaults()
 
 	// Override with request parameters if provided
 	if req.DataDir != "" {
@@ -104,9 +104,9 @@ func NewPostgresConfigFromStopRequest(req *pb.StopRequest) *PostgresConfig {
 	return config
 }
 
-// NewPostgresConfigFromStatusRequest creates a PostgresConfig from a gRPC StatusRequest
-func NewPostgresConfigFromStatusRequest(req *pb.StatusRequest) *PostgresConfig {
-	config := NewPostgresConfigFromDefaults()
+// NewPostgresConfigFromStatusRequest creates a PostgresCtlConfig from a gRPC StatusRequest
+func NewPostgresConfigFromStatusRequest(req *pb.StatusRequest) *PostgresCtlConfig {
+	config := NewPostgresCtlConfigFromDefaults()
 
 	// Override with request parameters if provided
 	if req.DataDir != "" {
@@ -146,7 +146,7 @@ Examples:
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 
 	// Override with command-specific flags if provided
 	if cmd.Flags().Changed("pg-socket-dir") {
@@ -175,7 +175,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 }
 
 // StartPostgreSQLWithResult starts PostgreSQL with the given configuration and returns detailed result information
-func StartPostgreSQLWithResult(config *PostgresConfig) (*StartResult, error) {
+func StartPostgreSQLWithResult(config *PostgresCtlConfig) (*StartResult, error) {
 	logger := slog.Default()
 	result := &StartResult{}
 
@@ -231,7 +231,7 @@ func StartPostgreSQLWithResult(config *PostgresConfig) (*StartResult, error) {
 }
 
 // StartPostgreSQLWithConfig starts PostgreSQL with the given configuration
-func StartPostgreSQLWithConfig(config *PostgresConfig) error {
+func StartPostgreSQLWithConfig(config *PostgresCtlConfig) error {
 	result, err := StartPostgreSQLWithResult(config)
 	if err != nil {
 		return err
@@ -306,7 +306,7 @@ func isPostgreSQLRunning(dataDir string) bool {
 	return isProcessRunning(pid)
 }
 
-func startPostgreSQLWithConfig(config *PostgresConfig) error {
+func startPostgreSQLWithConfig(config *PostgresCtlConfig) error {
 	// Use pg_ctl to start PostgreSQL properly as a daemon
 	args := []string{
 		"start",
@@ -346,11 +346,11 @@ func startPostgreSQLWithConfig(config *PostgresConfig) error {
 }
 
 func waitForPostgreSQL() error {
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 	return waitForPostgreSQLWithConfig(config)
 }
 
-func waitForPostgreSQLWithConfig(config *PostgresConfig) error {
+func waitForPostgreSQLWithConfig(config *PostgresCtlConfig) error {
 	// Try to connect using pg_isready
 	for i := 0; i < config.Timeout; i++ {
 		cmd := exec.Command("pg_isready",

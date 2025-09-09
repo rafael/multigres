@@ -59,7 +59,7 @@ Examples:
 }
 
 // GetVersionWithResult gets PostgreSQL server version information and returns detailed result information
-func GetVersionWithResult(config *PostgresConfig) (*VersionResult, error) {
+func GetVersionWithResult(config *PostgresCtlConfig) (*VersionResult, error) {
 	result := &VersionResult{}
 
 	// Get server version using the same method as the gRPC service
@@ -74,7 +74,7 @@ func GetVersionWithResult(config *PostgresConfig) (*VersionResult, error) {
 }
 
 func runVersion(cmd *cobra.Command, args []string) error {
-	config := NewPostgresConfigFromDefaults()
+	config := NewPostgresCtlConfigFromDefaults()
 
 	// No local flag overrides needed - all flags are global now
 
