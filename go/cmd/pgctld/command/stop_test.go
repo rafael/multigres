@@ -119,11 +119,11 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 			require.NoError(t, err)
 
 			// Always create data directory
-			testutil.CreateDataDir(t, pgConfig.DataDir, true)
+			dataDir := testutil.CreateDataDir(t, baseDir, true)
 
 			// Conditionally create PID file to simulate running/not running
 			if tt.createPIDFile {
-				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
+				testutil.CreatePIDFile(t, dataDir, 12345)
 			}
 
 			config := pgctld.NewPostgresCtlConfig(pgConfig, "localhost", "postgres", "postgres", "", 30)
@@ -171,12 +171,9 @@ func TestRunStop(t *testing.T) {
 		{
 			name: "successful stop command",
 			setupPoolerDir: func(baseDir string) string {
-				poolerDir := baseDir
-				pgctld.SetPoolerDirForTest(poolerDir)
-				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", pgPort)
-				testutil.CreateDataDir(t, pgConfig.DataDir, true)
-				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
-				return poolerDir
+				testutil.CreateDataDir(t, baseDir, true)
+				testutil.CreatePIDFile(t, baseDir, 12345)
+				return baseDir
 			},
 			setupBinaries: true,
 			mode:          "fast",
@@ -185,12 +182,9 @@ func TestRunStop(t *testing.T) {
 		{
 			name: "stop when not running",
 			setupPoolerDir: func(baseDir string) string {
-				poolerDir := baseDir
-				pgctld.SetPoolerDirForTest(poolerDir)
-				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", pgPort)
-				testutil.CreateDataDir(t, pgConfig.DataDir, true)
+				testutil.CreateDataDir(t, baseDir, true)
 				// Don't create PID file (not running)
-				return poolerDir
+				return baseDir
 			},
 			setupBinaries: false,
 			mode:          "fast",
@@ -199,14 +193,9 @@ func TestRunStop(t *testing.T) {
 		{
 			name: "stop with smart mode",
 			setupPoolerDir: func(baseDir string) string {
-				// This is to mock the case where the pooler dir was already set for testing
-				poolerDir := baseDir
-				cleanup := pgctld.SetPoolerDirForTest(poolerDir)
-				defer cleanup()
-				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", pgPort)
-				testutil.CreateDataDir(t, pgConfig.DataDir, true)
-				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
-				return poolerDir
+				testutil.CreateDataDir(t, baseDir, true)
+				testutil.CreatePIDFile(t, baseDir, 12345)
+				return baseDir
 			},
 			setupBinaries: true,
 			mode:          "smart",
@@ -239,9 +228,7 @@ func TestRunStop(t *testing.T) {
 
 			// Set up the command arguments
 			args := []string{"stop", "--mode", tt.mode}
-			if poolerDir != "" {
-				args = append(args, "--pooler-dir", poolerDir)
-			}
+			args = append(args, "--pooler-dir", poolerDir)
 			cmd.SetArgs(args)
 
 			err := cmd.Execute()

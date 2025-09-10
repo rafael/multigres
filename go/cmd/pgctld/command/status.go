@@ -60,17 +60,17 @@ CLI flags take precedence over config file and environment variable settings.
 
 Examples:
   # Check status with default settings
-  pgctld status --pg-data-dir /var/lib/postgresql/data
+  pgctld status --pooler-dir /var/lib/poolerdir/
 
   # Check status of PostgreSQL on custom port
-  pgctld status --pg-data-dir /var/lib/postgresql/data --port 5433
+  pgctld status --pooler-dir/var/lib/poolerdir/ --port 5433
 
   # Check status with specific connection parameters
-  pgctld status -d /var/lib/postgresql/data -H remotehost -U admin --pg-database mydb
+  pgctld status -d /var/lib/poolerdir/ -H remotehost -U admin --pg-database mydb
 
   # Check status of multiple instances
-  pgctld status -d /var/lib/postgresql/instance1 -p 5432
-  pgctld status -d /var/lib/postgresql/instance2 -p 5433`,
+  pgctld status -d /var/lib/poolerdir/instance1 -p 5432
+  pgctld status -d /var/lib/poolerdir/instance2 -p 5433`,
 	RunE: runStatus,
 }
 

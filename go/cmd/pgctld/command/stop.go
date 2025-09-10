@@ -97,7 +97,7 @@ func StopPostgreSQLWithResult(config *pgctld.PostgresCtlConfig, mode string) (*S
 	result := &StopResult{}
 
 	if config.DataDir() == "" {
-		return nil, fmt.Errorf("pg-data-dir is required")
+		return nil, fmt.Errorf("pg-data-dir is required, this is the config: %+v", config.PostgresConfig)
 	}
 
 	// Default mode to "fast" if not specified
