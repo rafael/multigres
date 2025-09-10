@@ -282,27 +282,12 @@ func startPostgreSQLWithConfig(config *pgctld.PostgresCtlConfig) error {
 	args := []string{
 		"start",
 		"-D", config.DataDir(),
+		"-o", "-c", fmt.Sprintf("config_file=%s", config.ConfigFile()),
 		"-l", filepath.Join(config.DataDir(), "postgresql.log"),
 		"-W", // don't wait - we'll check readiness ourselves
 	}
 
-	slog.Info("Starting PostgreSQL with configuration", "port", config.Port(), "dataDir", config.DataDir())
-
-	pgOptions := []string{
-		fmt.Sprintf("-p %d", config.Port()),
-	}
-
-	if config.SocketDir() != "" {
-		pgOptions = append(pgOptions, fmt.Sprintf("-k %s", config.SocketDir()))
-	}
-
-	if config.ConfigFile() != "" {
-		pgOptions = append(pgOptions, fmt.Sprintf("-c config_file=%s", config.ConfigFile()))
-	}
-
-	if len(pgOptions) > 0 {
-		args = append(args, "-o", strings.Join(pgOptions, " "))
-	}
+	slog.Info("Starting PostgreSQL with configuration", "port", config.Port(), "dataDir", config.DataDir(), "configFile", config.ConfigFile())
 
 	cmd := exec.Command("pg_ctl", args...)
 	cmd.Stdout = os.Stdout
