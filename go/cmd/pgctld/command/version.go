@@ -57,7 +57,8 @@ Examples:
   if pgctld version | grep -q "PostgreSQL 15"; then
     echo "Compatible version found"
   fi`,
-	RunE: runVersion,
+	PreRunE: validateGlobalFlags,
+	RunE:    runVersion,
 }
 
 // GetVersionWithResult gets PostgreSQL server version information and returns detailed result information
@@ -76,10 +77,7 @@ func GetVersionWithResult(config *pgctld.PostgresCtlConfig) (*VersionResult, err
 }
 
 func runVersion(cmd *cobra.Command, args []string) error {
-	config, err := NewPostgresCtlConfigFromDefaults()
-	if err != nil {
-		return fmt.Errorf("failed to create config: %w", err)
-	}
+	config := NewPostgresCtlConfigFromDefaults()
 
 	// No local flag overrides needed - all flags are global now
 

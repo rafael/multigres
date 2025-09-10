@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/multigres/multigres/go/cmd/pgctld/testutil"
-	"github.com/multigres/multigres/go/pgctld"
 )
 
 func TestRunStatus(t *testing.T) {
@@ -37,10 +36,6 @@ func TestRunStatus(t *testing.T) {
 	// Setup cleanup for cobra command execution
 	cleanupViper := SetupTestPgCtldCleanup(t)
 	defer cleanupViper()
-
-	// Set up pooler directory
-	cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
-	defer cleanupPooler()
 
 	// Setup mock binaries
 	binDir := filepath.Join(baseDir, "bin")
@@ -79,11 +74,7 @@ func TestRunStatus(t *testing.T) {
 
 	// Test 2: Stopped (initialized but no PID file)
 	t.Run("stopped", func(t *testing.T) {
-		// Generate PostgreSQL config and create initialized data directory
-		pgConfig, err := pgctld.GeneratePostgresServerConfig("test", pgPort)
-		require.NoError(t, err)
-		testutil.CreateDataDir(t, pgConfig.DataDir, true)
-
+		testutil.CreateDataDir(t, baseDir, true)
 		output, err := runStatusCommand()
 		require.NoError(t, err)
 		assert.Contains(t, output, "Status: Stopped")
@@ -92,10 +83,11 @@ func TestRunStatus(t *testing.T) {
 	// Test 3: Running (initialized with PID file)
 	t.Run("running", func(t *testing.T) {
 		// Generate PostgreSQL config and create PID file to simulate running
-		testutil.CreateDataDir(t, baseDir, true)
-		testutil.CreatePIDFile(t, baseDir, 12345)
+		dataDir := testutil.CreateDataDir(t, baseDir, true)
+		testutil.CreatePIDFile(t, dataDir, 12345)
 
 		output, err := runStatusCommand()
+		t.Logf("output: %s", output)
 		require.NoError(t, err)
 		assert.Contains(t, output, "Status: Running")
 		assert.Contains(t, output, "PID:")

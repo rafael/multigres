@@ -33,13 +33,24 @@ func init() {
 	Root.AddCommand(ServerCmd)
 }
 
+// validateServerFlags validates required flags for the server command
+func validateServerFlags(cmd *cobra.Command, args []string) error {
+	// First run the standard servenv validation
+	if err := servenv.CobraPreRunE(cmd, args); err != nil {
+		return err
+	}
+
+	// Then run our global validation
+	return validateGlobalFlags(cmd, args)
+}
+
 var ServerCmd = &cobra.Command{
 	Use:     "server",
 	Short:   "Run pgctld as a gRPC server daemon",
 	Long:    `Run pgctld as a background gRPC server daemon to handle PostgreSQL management requests.`,
 	RunE:    runServer,
 	Args:    cobra.NoArgs,
-	PreRunE: servenv.CobraPreRunE,
+	PreRunE: validateServerFlags,
 }
 
 func runServer(cmd *cobra.Command, args []string) error {
@@ -130,18 +141,12 @@ func (s *PgCtldService) Restart(ctx context.Context, req *pb.RestartRequest) (*p
 		port = int(req.Port)
 	}
 
-	// Load or create PostgreSQL server config
-	pgConfig, err := pgctld.LoadOrCreatePostgresServerConfig("default", port)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load postgres config: %w", err)
-	}
-
 	timeout := timeout
 	if req.Timeout > 0 {
 		timeout = int(req.Timeout)
 	}
 
-	config := pgctld.NewPostgresCtlConfig(pgConfig, pgHost, pgUser, pgDatabase, pgPassword, timeout)
+	config := pgctld.NewPostgresCtlConfig(pgHost, port, pgUser, pgDatabase, pgPassword, timeout)
 
 	// Use the shared restart function with detailed result
 	result, err := RestartPostgreSQLWithResult(config, req.Mode)
@@ -159,10 +164,7 @@ func (s *PgCtldService) ReloadConfig(ctx context.Context, req *pb.ReloadConfigRe
 	s.logger.Info("gRPC ReloadConfig request")
 
 	// Create config from request parameters
-	config, err := NewPostgresCtlConfigFromDefaults()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create config: %w", err)
-	}
+	config := NewPostgresCtlConfigFromDefaults()
 
 	// Use the shared reload function with detailed result
 	result, err := ReloadPostgreSQLConfigWithResult(config)
@@ -225,20 +227,14 @@ func (s *PgCtldService) Version(ctx context.Context, req *pb.VersionRequest) (*p
 		port = int(req.Port)
 	}
 
-	// Load or create PostgreSQL server config
-	pgConfig, err := pgctld.LoadOrCreatePostgresServerConfig("default", port)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load postgres config: %w", err)
-	}
-
 	// Create config with overrides from request
 	config := &pgctld.PostgresCtlConfig{
-		PostgresConfig: pgConfig,
-		Host:           pgHost,
-		User:           pgUser,
-		Database:       pgDatabase,
-		Password:       pgPassword,
-		Timeout:        timeout,
+		Host:     pgHost,
+		Port:     port,
+		User:     pgUser,
+		Database: pgDatabase,
+		Password: pgPassword,
+		Timeout:  timeout,
 	}
 
 	// Override with request parameters if provided

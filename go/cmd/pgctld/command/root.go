@@ -40,15 +40,10 @@ var (
 
 // validateGlobalFlags validates required global flags for all pgctld commands
 func validateGlobalFlags(cmd *cobra.Command, args []string) error {
-	// First run the standard servenv validation
-	if err := servenv.CobraPreRunE(cmd, args); err != nil {
-		return err
-	}
-
 	// Validate pooler-dir is required and non-empty for all commands
 	poolerDir := pgctld.GetPoolerDir()
 	if poolerDir == "" {
-		return fmt.Errorf("--pooler-dir is required and cannot be empty")
+		return fmt.Errorf("pooler-dir needs to be set")
 	}
 
 	return nil
@@ -61,8 +56,7 @@ var Root = &cobra.Command{
 	Long: `pgctld manages PostgreSQL server instances within the Multigres cluster.
 It provides lifecycle management including start, stop, restart, and configuration
 management for PostgreSQL servers.`,
-	Args:    cobra.NoArgs,
-	PreRunE: validateGlobalFlags,
+	Args: cobra.NoArgs,
 }
 
 func init() {

@@ -14,119 +14,26 @@
 
 package pgctld
 
-import "fmt"
-
 // PostgresCtlConfig holds all PostgreSQL control configuration parameters
 // It contains a PostgresServerConfig for all PostgreSQL-specific settings
 // plus additional connection parameters for control operations
 type PostgresCtlConfig struct {
-	PostgresConfig *PostgresServerConfig
-	Host           string
-	User           string
-	Database       string
-	Password       string
-	Timeout        int
-}
-
-// Port returns the PostgreSQL server port from the configuration
-func (c *PostgresCtlConfig) Port() int {
-	if c.PostgresConfig == nil {
-		panic("PostgresConfig is nil - config not properly initialized")
-	}
-	return c.PostgresConfig.Port
-}
-
-// DataDir returns the PostgreSQL data directory path from the configuration
-func (c *PostgresCtlConfig) DataDir() string {
-	if c.PostgresConfig == nil {
-		panic("PostgresConfig is nil - config not properly initialized")
-	}
-	return c.PostgresConfig.DataDir
-}
-
-// SocketDir returns the PostgreSQL Unix socket directory path from the configuration
-func (c *PostgresCtlConfig) SocketDir() string {
-	if c.PostgresConfig == nil {
-		panic("PostgresConfig is nil - config not properly initialized")
-	}
-	return c.PostgresConfig.UnixSocketDirectories
-}
-
-// ConfigFile returns the PostgreSQL configuration file path from the configuration
-func (c *PostgresCtlConfig) ConfigFile() string {
-	if c.PostgresConfig == nil {
-		panic("PostgresConfig is nil - config not properly initialized")
-	}
-	return c.PostgresConfig.Path
-}
-
-// ListenAddresses returns the PostgreSQL listen addresses from the configuration
-func (c *PostgresCtlConfig) ListenAddresses() string {
-	if c.PostgresConfig == nil {
-		panic("PostgresConfig is nil - config not properly initialized")
-	}
-	return c.PostgresConfig.ListenAddresses
-}
-
-// ClusterName returns the PostgreSQL cluster name from the configuration
-func (c *PostgresCtlConfig) ClusterName() string {
-	if c.PostgresConfig == nil {
-		panic("PostgresConfig is nil - config not properly initialized")
-	}
-	return c.PostgresConfig.ClusterName
-}
-
-// HbaFile returns the PostgreSQL host-based authentication file path from the configuration
-func (c *PostgresCtlConfig) HbaFile() string {
-	if c.PostgresConfig == nil {
-		panic("PostgresConfig is nil - config not properly initialized")
-	}
-	return c.PostgresConfig.HbaFile
-}
-
-// IdentFile returns the PostgreSQL ident authentication file path from the configuration
-func (c *PostgresCtlConfig) IdentFile() string {
-	if c.PostgresConfig == nil {
-		panic("PostgresConfig is nil - config not properly initialized")
-	}
-	return c.PostgresConfig.IdentFile
-}
-
-// MaxConnections returns the PostgreSQL maximum connections setting from the configuration
-func (c *PostgresCtlConfig) MaxConnections() int {
-	if c.PostgresConfig == nil {
-		panic("PostgresConfig is nil - config not properly initialized")
-	}
-	return c.PostgresConfig.MaxConnections
+	Host     string
+	Port     int
+	User     string
+	Database string
+	Password string
+	Timeout  int
 }
 
 // NewPostgresCtlConfig creates a PostgresCtlConfig with the given parameters
-func NewPostgresCtlConfig(pgConfig *PostgresServerConfig, host, user, database, password string, timeout int) *PostgresCtlConfig {
+func NewPostgresCtlConfig(host string, port int, user, database, password string, timeout int) *PostgresCtlConfig {
 	return &PostgresCtlConfig{
-		PostgresConfig: pgConfig,
-		Host:           host,
-		User:           user,
-		Database:       database,
-		Password:       password,
-		Timeout:        timeout,
+		Host:     host,
+		Port:     port,
+		User:     user,
+		Database: database,
+		Password: password,
+		Timeout:  timeout,
 	}
-}
-
-// NewPostgresCtlConfigFromDefaults creates a PostgresCtlConfig with default values
-// This function loads or creates a PostgreSQL server configuration
-func NewPostgresCtlConfigFromDefaults(pgPort int, pgHost, pgUser, pgDatabase, pgPassword string, timeout int) (*PostgresCtlConfig, error) {
-	// Load or create PostgreSQL server config
-	pgConfig, err := LoadOrCreatePostgresServerConfig("default", pgPort)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load postgres config: %w", err)
-	}
-
-	return &PostgresCtlConfig{
-		PostgresConfig: pgConfig,
-		Host:           pgHost,
-		User:           pgUser,
-		Database:       pgDatabase,
-		Password:       pgPassword,
-		Timeout:        timeout,
-	}, nil
 }

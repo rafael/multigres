@@ -55,7 +55,8 @@ Examples:
 
   # Initialize using config file settings
   pgctld init --config-file /etc/pgctld/config.yaml`,
-	RunE: runInit,
+	PreRunE: validateGlobalFlags,
+	RunE:    runInit,
 }
 
 // InitDataDirWithResult initializes PostgreSQL data directory and returns detailed result information

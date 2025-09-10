@@ -31,6 +31,7 @@ import (
 
 	"github.com/multigres/multigres/go/cmd/pgctld/testutil"
 	pb "github.com/multigres/multigres/go/pb/pgctldservice"
+	"github.com/multigres/multigres/go/pgctld"
 )
 
 // TestGRPCServerIntegration tests the gRPC server with mock PostgreSQL
@@ -338,6 +339,7 @@ func createTestGRPCServer(t *testing.T, dataDir, binDir string) (net.Listener, f
 
 	// Setup cleanup for global variables
 	cleanupViper := SetupTestPgCtldCleanup(t)
+	cleanupPooler := pgctld.SetPoolerDirForTest(dataDir)
 
 	// Find a free port
 	lis, err := net.Listen("tcp", "localhost:0")
@@ -379,6 +381,7 @@ func createTestGRPCServer(t *testing.T, dataDir, binDir string) (net.Listener, f
 	cleanup := func() {
 		grpcServer.Stop()
 		cleanupViper()
+		cleanupPooler()
 	}
 
 	return lis, cleanup

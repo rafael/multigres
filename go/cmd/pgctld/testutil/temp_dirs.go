@@ -72,7 +72,7 @@ func CreateDataDir(t *testing.T, baseDir string, initialized bool) string {
 		defer cleanup()
 
 		// Generate a proper postgresql.conf file using the postgresconfig_gen functionality
-		_, err := pgctld.GeneratePostgresServerConfig("test-pooler", GenerateRandomPort())
+		_, err := pgctld.GeneratePostgresServerConfig("test-pooler", 5432)
 		if err != nil {
 			t.Fatalf("Failed to generate PostgreSQL config: %v", err)
 		}

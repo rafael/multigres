@@ -114,10 +114,6 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 				defer os.Setenv("PATH", originalPath)
 			}
 
-			// Create a mock PostgreSQL server config
-			pgConfig, err := pgctld.GeneratePostgresServerConfig("test", pgPort)
-			require.NoError(t, err)
-
 			// Always create data directory
 			dataDir := testutil.CreateDataDir(t, baseDir, true)
 
@@ -126,7 +122,7 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 				testutil.CreatePIDFile(t, dataDir, 12345)
 			}
 
-			config := pgctld.NewPostgresCtlConfig(pgConfig, "localhost", "postgres", "postgres", "", 30)
+			config := pgctld.NewPostgresCtlConfig("localhost", pgPort, "postgres", "postgres", "", 30)
 
 			result, err := StopPostgreSQLWithResult(config, tt.mode)
 
@@ -293,14 +289,14 @@ func TestStopPostgreSQLWithConfig(t *testing.T) {
 			require.NoError(t, err)
 
 			// Always create data directory
-			testutil.CreateDataDir(t, pgConfig.DataDir, true)
+			testutil.CreateDataDir(t, baseDir, true)
 
 			// Conditionally create PID file to simulate running/not running
 			if tt.createPIDFile {
 				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
 			}
 
-			config := pgctld.NewPostgresCtlConfig(pgConfig, "localhost", "postgres", "postgres", "", 30)
+			config := pgctld.NewPostgresCtlConfig("localhost", pgPort, "postgres", "postgres", "", 30)
 
 			err = StopPostgreSQLWithConfig(config, tt.mode)
 
@@ -325,9 +321,7 @@ func TestTakeCheckpoint(t *testing.T) {
 			name:          "successful checkpoint",
 			setupBinaries: true,
 			config: func() *pgctld.PostgresCtlConfig {
-				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", pgPort)
-				pgConfig.DataDir = "/tmp/test"
-				return pgctld.NewPostgresCtlConfig(pgConfig, "localhost", "postgres", "postgres", "", 30)
+				return pgctld.NewPostgresCtlConfig("localhost", pgPort, "postgres", "postgres", "", 30)
 			},
 			expectError: false,
 		},
@@ -335,8 +329,7 @@ func TestTakeCheckpoint(t *testing.T) {
 			name:          "checkpoint with password",
 			setupBinaries: true,
 			config: func() *pgctld.PostgresCtlConfig {
-				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", pgPort)
-				return pgctld.NewPostgresCtlConfig(pgConfig, "localhost", "postgres", "postgres", "secret", 30)
+				return pgctld.NewPostgresCtlConfig("localhost", pgPort, "postgres", "postgres", "secret", 30)
 			},
 			expectError: false,
 		},
@@ -344,8 +337,7 @@ func TestTakeCheckpoint(t *testing.T) {
 			name:          "checkpoint failure - psql command fails",
 			setupBinaries: true, // Create failing psql binary
 			config: func() *pgctld.PostgresCtlConfig {
-				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", pgPort)
-				return pgctld.NewPostgresCtlConfig(pgConfig, "localhost", "postgres", "postgres", "", 30)
+				return pgctld.NewPostgresCtlConfig("localhost", pgPort, "postgres", "postgres", "", 30)
 			},
 			expectError:   true,
 			errorContains: "checkpoint command failed",

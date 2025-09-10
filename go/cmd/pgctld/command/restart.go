@@ -58,7 +58,8 @@ Examples:
 
   # Restart with immediate stop and custom socket directory
   pgctld restart -d /data --mode immediate -s /var/run/postgresql`,
-	RunE: runRestart,
+	PreRunE: validateGlobalFlags,
+	RunE:    runRestart,
 }
 
 // RestartPostgreSQLWithResult restarts PostgreSQL with the given configuration and returns detailed result information
@@ -66,14 +67,14 @@ func RestartPostgreSQLWithResult(config *pgctld.PostgresCtlConfig, mode string) 
 	logger := slog.Default()
 	result := &RestartResult{}
 
-	if config.DataDir() == "" {
+	if pgctld.PostgresDataDir() == "" {
 		return nil, fmt.Errorf("data-dir is required")
 	}
 
-	logger.Info("Restarting PostgreSQL server", "data_dir", config.DataDir(), "mode", mode)
+	logger.Info("Restarting PostgreSQL server", "data_dir", pgctld.PostgresDataDir(), "mode", mode)
 
 	// Stop the server if it's running
-	if isPostgreSQLRunning(config.DataDir()) {
+	if isPostgreSQLRunning(pgctld.PostgresDataDir()) {
 		logger.Info("Stopping PostgreSQL server")
 		stopResult, err := StopPostgreSQLWithResult(config, mode)
 		if err != nil {
@@ -100,10 +101,7 @@ func RestartPostgreSQLWithResult(config *pgctld.PostgresCtlConfig, mode string) 
 }
 
 func runRestart(cmd *cobra.Command, args []string) error {
-	config, err := NewPostgresCtlConfigFromDefaults()
-	if err != nil {
-		return fmt.Errorf("failed to create config: %w", err)
-	}
+	config := NewPostgresCtlConfigFromDefaults()
 	mode, _ := cmd.Flags().GetString("mode")
 
 	result, err := RestartPostgreSQLWithResult(config, mode)
