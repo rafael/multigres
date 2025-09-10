@@ -25,6 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/multigres/multigres/go/pgctld"
+
 	"github.com/multigres/multigres/go/cmd/pgctld/testutil"
 	pb "github.com/multigres/multigres/go/pb/pgctldservice"
 )
@@ -90,9 +92,12 @@ func TestPgCtldService_Start(t *testing.T) {
 			baseDir, cleanup := testutil.TempDir(t, "pgctld_grpc_start_test")
 			defer cleanup()
 
-			_ = tt.setupDataDir(baseDir) // TODO: This needs to be updated to use poolerDir instead of dataDir when we fix this test in detail
+			cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
+			defer cleanupPooler()
 
-			// TODO: This needs to be updated to use poolerDir instead of dataDir when we fix this test in detail
+			pgDataDir := filepath.Join(baseDir, "pg_data")
+
+			_ = tt.setupDataDir(pgDataDir)
 
 			if tt.setupBinaries {
 				binDir := filepath.Join(baseDir, "bin")
@@ -128,7 +133,7 @@ func TestPgCtldService_Start(t *testing.T) {
 	}
 }
 
-func TestPgCtldService_Stop(t *testing.T) {
+func TestPgCtldServiceStop(t *testing.T) {
 	tests := []struct {
 		name          string
 		request       *pb.StopRequest
@@ -175,9 +180,11 @@ func TestPgCtldService_Stop(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			baseDir, cleanup := testutil.TempDir(t, "pgctld_grpc_stop_test")
 			defer cleanup()
+			cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
+			defer cleanupPooler()
 
-			_ = tt.setupDataDir(baseDir) // TODO: This needs to be updated to use poolerDir instead of dataDir when we fix this test in detail
-			// TODO: This needs to be updated to use poolerDir instead of dataDir when we fix this test in detail
+			pgDataDir := filepath.Join(baseDir, "pg_data")
+			_ = tt.setupDataDir(pgDataDir)
 
 			if tt.setupBinaries {
 				binDir := filepath.Join(baseDir, "bin")
@@ -251,8 +258,11 @@ func TestPgCtldService_Status(t *testing.T) {
 			baseDir, cleanup := testutil.TempDir(t, "pgctld_grpc_status_test")
 			defer cleanup()
 
-			_ = tt.setupDataDir(baseDir) // TODO: This needs to be updated to use poolerDir instead of dataDir when we fix this test in detail
-			// TODO: This needs to be updated to use poolerDir instead of dataDir when we fix this test in detail
+			cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
+			defer cleanupPooler()
+
+			pgDataDir := filepath.Join(baseDir, "pg_data")
+			_ = tt.setupDataDir(pgDataDir)
 
 			cleanupViper := SetupTestPgCtldCleanup(t)
 			defer cleanupViper()
@@ -285,6 +295,9 @@ func TestPgCtldService_Restart(t *testing.T) {
 		testutil.CreateMockPostgreSQLBinaries(t, binDir)
 		t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
 
+		cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
+		defer cleanupPooler()
+
 		cleanupViper := SetupTestPgCtldCleanup(t)
 		defer cleanupViper()
 
@@ -311,13 +324,17 @@ func TestPgCtldService_ReloadConfig(t *testing.T) {
 		baseDir, cleanup := testutil.TempDir(t, "pgctld_grpc_reload_test")
 		defer cleanup()
 
-		dataDir := testutil.CreateDataDir(t, baseDir, true)
-		testutil.CreatePIDFile(t, dataDir, 12345)
-
 		binDir := filepath.Join(baseDir, "bin")
 		require.NoError(t, os.MkdirAll(binDir, 0o755))
 		testutil.CreateMockPostgreSQLBinaries(t, binDir)
 		t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
+
+		cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
+		defer cleanupPooler()
+
+		pgDataDir := filepath.Join(baseDir, "pg_data")
+		dataDir := testutil.CreateDataDir(t, pgDataDir, true)
+		testutil.CreatePIDFile(t, dataDir, 12345)
 
 		cleanupViper := SetupTestPgCtldCleanup(t)
 		defer cleanupViper()
@@ -339,7 +356,11 @@ func TestPgCtldService_ReloadConfig(t *testing.T) {
 		baseDir, cleanup := testutil.TempDir(t, "pgctld_grpc_reload_test")
 		defer cleanup()
 
-		_ = testutil.CreateDataDir(t, baseDir, true) // TODO: This needs to be updated to use poolerDir instead of dataDir when we fix this test in detail
+		cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
+		defer cleanupPooler()
+
+		pgDataDir := filepath.Join(baseDir, "pg_data")
+		testutil.CreateDataDir(t, pgDataDir, true)
 		// No PID file = not running
 
 		cleanupViper := SetupTestPgCtldCleanup(t)
@@ -368,6 +389,9 @@ func TestPgCtldService_Version(t *testing.T) {
 		testutil.CreateMockPostgreSQLBinaries(t, binDir)
 		t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
 
+		cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
+		defer cleanupPooler()
+
 		cleanupViper := SetupTestPgCtldCleanup(t)
 		defer cleanupViper()
 
@@ -395,7 +419,8 @@ func TestPgCtldService_InitDataDir(t *testing.T) {
 		baseDir, cleanup := testutil.TempDir(t, "pgctld_grpc_init_test")
 		defer cleanup()
 
-		_ = filepath.Join(baseDir, "data") // TODO: This needs to be updated to use poolerDir instead of dataDir when we fix this test in detail
+		cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
+		defer cleanupPooler()
 
 		binDir := filepath.Join(baseDir, "bin")
 		require.NoError(t, os.MkdirAll(binDir, 0o755))
@@ -422,7 +447,11 @@ func TestPgCtldService_InitDataDir(t *testing.T) {
 		baseDir, cleanup := testutil.TempDir(t, "pgctld_grpc_init_test")
 		defer cleanup()
 
-		_ = testutil.CreateDataDir(t, baseDir, true) // TODO: This needs to be updated to use poolerDir instead of dataDir when we fix this test in detail
+		cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
+		defer cleanupPooler()
+
+		pgDataDir := filepath.Join(baseDir, "pg_data")
+		_ = testutil.CreateDataDir(t, pgDataDir, true)
 
 		service := &PgCtldService{
 			logger: testLogger(),

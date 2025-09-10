@@ -70,19 +70,13 @@ func TestRunStart(t *testing.T) {
 			baseDir, cleanup := testutil.TempDir(t, "pgctld_start_test")
 			defer cleanup()
 
-			// Set up pooler directory
-			cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
-			defer cleanupPooler()
-
-			// Create postgres config for this test
-			pgConfig, err := pgctld.GeneratePostgresServerConfig("test", pgPort)
-			require.NoError(t, err)
-
 			// Setup cleanup for cobra command execution
 			cleanupViper := SetupTestPgCtldCleanup(t)
 			defer cleanupViper()
 
-			dataDir := tt.setupDataDir(pgConfig.DataDir)
+			// This is the convention we use in Multigres, for e the pg_data dir
+			pgDataDir := filepath.Join(baseDir, "pg_data")
+			dataDir := tt.setupDataDir(pgDataDir)
 
 			// Setup mock binaries if needed
 			if tt.setupBinaries {
@@ -102,7 +96,7 @@ func TestRunStart(t *testing.T) {
 			args := []string{"start", "--pooler-dir", baseDir}
 			cmd.SetArgs(args)
 
-			err = cmd.Execute()
+			err := cmd.Execute()
 
 			if tt.expectError {
 				require.Error(t, err)
