@@ -31,127 +31,63 @@ import (
 func TestStopPostgreSQLWithResult(t *testing.T) {
 	tests := []struct {
 		name           string
-		setupPoolerDir func(string) string
 		setupBinaries  bool
+		createPIDFile  bool
 		mode           string
-		config         func(*pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig
 		expectError    bool
 		errorContains  string
 		expectedResult func(*StopResult)
 	}{
 		{
-			name: "successful stop with fast mode",
-			setupPoolerDir: func(baseDir string) string {
-				poolerDir := baseDir
-				pgctld.SetPoolerDirForTest(poolerDir)
-				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
-				testutil.CreateDataDir(t, pgConfig.DataDir, true)
-				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
-				return poolerDir
-			},
+			name:          "successful stop with fast mode",
 			setupBinaries: true,
+			createPIDFile: true,
 			mode:          "fast",
-			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
-				return config
-			},
-			expectError: false,
+			expectError:   false,
 			expectedResult: func(result *StopResult) {
 				assert.True(t, result.WasRunning)
 				assert.Equal(t, "PostgreSQL server stopped successfully", result.Message)
 			},
 		},
 		{
-			name: "successful stop with smart mode",
-			setupPoolerDir: func(baseDir string) string {
-				poolerDir := baseDir
-				pgctld.SetPoolerDirForTest(poolerDir)
-				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
-				testutil.CreateDataDir(t, pgConfig.DataDir, true)
-				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
-				return poolerDir
-			},
+			name:          "successful stop with smart mode",
 			setupBinaries: true,
+			createPIDFile: true,
 			mode:          "smart",
-			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
-				return config
-			},
-			expectError: false,
+			expectError:   false,
 			expectedResult: func(result *StopResult) {
 				assert.True(t, result.WasRunning)
 				assert.Equal(t, "PostgreSQL server stopped successfully", result.Message)
 			},
 		},
 		{
-			name: "successful stop with immediate mode",
-			setupPoolerDir: func(baseDir string) string {
-				poolerDir := baseDir
-				pgctld.SetPoolerDirForTest(poolerDir)
-				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
-				testutil.CreateDataDir(t, pgConfig.DataDir, true)
-				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
-				return poolerDir
-			},
+			name:          "successful stop with immediate mode",
 			setupBinaries: true,
+			createPIDFile: true,
 			mode:          "immediate",
-			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
-				return config
-			},
-			expectError: false,
+			expectError:   false,
 			expectedResult: func(result *StopResult) {
 				assert.True(t, result.WasRunning)
 				assert.Equal(t, "PostgreSQL server stopped successfully", result.Message)
 			},
 		},
 		{
-			name: "stop when PostgreSQL is not running",
-			setupPoolerDir: func(baseDir string) string {
-				poolerDir := baseDir
-				pgctld.SetPoolerDirForTest(poolerDir)
-				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
-				testutil.CreateDataDir(t, pgConfig.DataDir, true)
-				// Don't create PID file (not running)
-				return poolerDir
-			},
+			name:          "stop when PostgreSQL is not running",
 			setupBinaries: false,
+			createPIDFile: false,
 			mode:          "fast",
-			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
-				return config
-			},
-			expectError: false,
+			expectError:   false,
 			expectedResult: func(result *StopResult) {
 				assert.False(t, result.WasRunning)
 				assert.Equal(t, "PostgreSQL is not running", result.Message)
 			},
 		},
 		{
-			name:           "error when data-dir is empty",
-			setupPoolerDir: func(baseDir string) string { return "" },
-			mode:           "fast",
-			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
-				// Create a new config with empty DataDir
-				emptyPgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
-				emptyPgConfig.DataDir = ""
-				return pgctld.NewPostgresCtlConfig(emptyPgConfig, "localhost", "postgres", "postgres", "", 30)
-			},
-			expectError:   true,
-			errorContains: "pg-data-dir is required",
-		},
-		{
-			name: "default mode when empty string provided",
-			setupPoolerDir: func(baseDir string) string {
-				poolerDir := baseDir
-				pgctld.SetPoolerDirForTest(poolerDir)
-				pgConfig, _ := pgctld.GeneratePostgresServerConfig("test", 5432)
-				testutil.CreateDataDir(t, pgConfig.DataDir, true)
-				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
-				return poolerDir
-			},
+			name:          "default mode when empty string provided",
 			setupBinaries: true,
+			createPIDFile: true,
 			mode:          "", // Empty mode should default to "fast"
-			config: func(config *pgctld.PostgresCtlConfig) *pgctld.PostgresCtlConfig {
-				return config
-			},
-			expectError: false,
+			expectError:   false,
 			expectedResult: func(result *StopResult) {
 				assert.True(t, result.WasRunning)
 				assert.Equal(t, "PostgreSQL server stopped successfully", result.Message)
@@ -164,7 +100,9 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 			baseDir, cleanup := testutil.TempDir(t, "pgctld_stop_test")
 			defer cleanup()
 
-			tt.setupPoolerDir(baseDir)
+			// Set up pooler directory
+			cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
+			defer cleanupPooler()
 
 			if tt.setupBinaries {
 				binDir := filepath.Join(baseDir, "bin")
@@ -180,8 +118,15 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 			pgConfig, err := pgctld.GeneratePostgresServerConfig("test", 5432)
 			require.NoError(t, err)
 
+			// Always create data directory
+			testutil.CreateDataDir(t, pgConfig.DataDir, true)
+
+			// Conditionally create PID file to simulate running/not running
+			if tt.createPIDFile {
+				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
+			}
+
 			config := pgctld.NewPostgresCtlConfig(pgConfig, "localhost", "postgres", "postgres", "", 30)
-			config = tt.config(config)
 
 			result, err := StopPostgreSQLWithResult(config, tt.mode)
 

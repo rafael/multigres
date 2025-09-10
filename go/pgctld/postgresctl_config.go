@@ -28,7 +28,6 @@ type PostgresCtlConfig struct {
 	Timeout        int
 }
 
-// Accessor methods for PostgreSQL configuration
 func (c *PostgresCtlConfig) Port() int {
 	if c.PostgresConfig == nil {
 		panic("PostgresConfig is nil - config not properly initialized")

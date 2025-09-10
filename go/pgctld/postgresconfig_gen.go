@@ -15,6 +15,7 @@
 package pgctld
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -60,6 +61,9 @@ func SetPoolerDirForTest(testDir string) func() {
 // poolerId is used for the cluster name and path generation.
 // port is the port for the PostgreSQL server.
 func GeneratePostgresServerConfig(poolerId string, port int) (*PostgresServerConfig, error) {
+	if poolerDir == "" {
+		return nil, fmt.Errorf("--pooler-dir needs to be set to generate postgres server config")
+	}
 	configPath := PostgresConfigFile()
 	baseDir := PostgresBaseDir()
 
