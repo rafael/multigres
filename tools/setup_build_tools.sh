@@ -25,7 +25,9 @@ PROTOC_VERSION="$PROTOC_VER"
 ADDLICENSE_VERSION="$ADDLICENSE_VER"
 PROTOC_GEN_GO_VERSION="$PROTOC_GEN_GO_VER"
 PROTOC_GEN_GO_GRPC_VERSION="$PROTOC_GEN_GO_GRPC_VER"
+GOIMPORTS_VERSION="$GOIMPORTS_VER"
 ETCD_VERSION="$ETCD_VER"
+GOFUMPT_VERSION="$GOFUMPT_VER"
 
 get_platform() {
     case $(uname) in
@@ -144,6 +146,7 @@ install_etcd() {
     fi
 
     rm "$filename"
+    mkdir -p "$MTROOT/bin"
     ln -snf "$dist/etcd-${version}-${platform}-${arch}/etcd" "$MTROOT/bin/etcd"
     ln -snf "$dist/etcd-${version}-${platform}-${arch}/etcdctl" "$MTROOT/bin/etcdctl"
     cd - > /dev/null
@@ -160,6 +163,12 @@ install_go_plugins() {
         echo "Installing protoc-gen-go-grpc $PROTOC_GEN_GO_GRPC_VERSION..."
         go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@$PROTOC_GEN_GO_GRPC_VERSION
     fi
+
+    # Check if goimports is installed
+    if ! command -v goimports >/dev/null 2>&1; then
+    echo "goimports not found. Installing version $GOIMPORTS_VERSION..."
+    go install golang.org/x/tools/cmd/goimports@$GOIMPORTS_VERSION
+    fi
 }
 
 install_go_tools() {
@@ -167,6 +176,11 @@ install_go_tools() {
     if ! command -v addlicense >/dev/null 2>&1; then
         echo "Installing addlicense $ADDLICENSE_VERSION..."
         go install github.com/google/addlicense@$ADDLICENSE_VERSION
+    fi
+    # Install gofumpt if not already installed
+    if ! command -v gofumpt >/dev/null 2>&1; then
+        echo "Installing gofumpt $GOFUMPT_VERSION..."
+        go install mvdan.cc/gofumpt@$GOFUMPT_VERSION
     fi
 }
 
