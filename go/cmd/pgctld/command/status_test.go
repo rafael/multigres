@@ -80,7 +80,7 @@ func TestRunStatus(t *testing.T) {
 	// Test 2: Stopped (initialized but no PID file)
 	t.Run("stopped", func(t *testing.T) {
 		// Generate PostgreSQL config and create initialized data directory
-		pgConfig, err := pgctld.GeneratePostgresServerConfig("test", 5432)
+		pgConfig, err := pgctld.GeneratePostgresServerConfig("test", pgPort)
 		require.NoError(t, err)
 		testutil.CreateDataDir(t, pgConfig.DataDir, true)
 
@@ -92,7 +92,7 @@ func TestRunStatus(t *testing.T) {
 	// Test 3: Running (initialized with PID file)
 	t.Run("running", func(t *testing.T) {
 		// Generate PostgreSQL config and create PID file to simulate running
-		pgConfig, err := pgctld.GeneratePostgresServerConfig("test", 5432)
+		pgConfig, err := pgctld.GeneratePostgresServerConfig("test", pgPort)
 		require.NoError(t, err)
 		testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
 

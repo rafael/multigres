@@ -75,7 +75,7 @@ func TestRunStart(t *testing.T) {
 			defer cleanupPooler()
 
 			// Create postgres config for this test
-			pgConfig, err := pgctld.GeneratePostgresServerConfig("test", 5432)
+			pgConfig, err := pgctld.GeneratePostgresServerConfig("test", pgPort)
 			require.NoError(t, err)
 
 			// Setup cleanup for cobra command execution

@@ -72,7 +72,7 @@ timeout: 30
 
 	t.Run("basic_commands_with_real_postgresql", func(t *testing.T) {
 		// Step 1: Initial status - should be not initialized
-		statusCmd := exec.Command(pgctldBinary, "status", "--pg-data-dir", dataDir, "--config-file", pgctldConfigFile)
+		statusCmd := exec.Command(pgctldBinary, "status", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 		setupTestEnv(statusCmd)
 		output, err := statusCmd.CombinedOutput()
 		if err != nil {
@@ -143,7 +143,7 @@ timeout: 30
 
 		// Start gRPC server in background
 		serverCmd := exec.Command(pgctldBinary, "server",
-			"--pg-data-dir", dataDir,
+			"--pooler-dir", dataDir,
 			"--grpc-port", strconv.Itoa(grpcPort),
 			"--pg-port", strconv.Itoa(pgPort),
 			"--config-file", pgctldConfigFile)
@@ -223,7 +223,7 @@ timeout: 30
 		// Measure time to start PostgreSQL
 		startTime := time.Now()
 
-		startCmd := exec.Command(pgctldBinary, "start", "--pg-data-dir", dataDir, "--pg-port", strconv.Itoa(perfTestPort), "--config-file", pgctldConfigFile)
+		startCmd := exec.Command(pgctldBinary, "start", "--pooler-dir", dataDir, "--pg-port", strconv.Itoa(perfTestPort), "--config-file", pgctldConfigFile)
 		setupTestEnv(startCmd)
 		err = startCmd.Run()
 		require.NoError(t, err)
