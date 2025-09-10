@@ -28,6 +28,7 @@ type PostgresCtlConfig struct {
 	Timeout        int
 }
 
+// Port returns the PostgreSQL server port from the configuration
 func (c *PostgresCtlConfig) Port() int {
 	if c.PostgresConfig == nil {
 		panic("PostgresConfig is nil - config not properly initialized")
@@ -35,6 +36,7 @@ func (c *PostgresCtlConfig) Port() int {
 	return c.PostgresConfig.Port
 }
 
+// DataDir returns the PostgreSQL data directory path from the configuration
 func (c *PostgresCtlConfig) DataDir() string {
 	if c.PostgresConfig == nil {
 		panic("PostgresConfig is nil - config not properly initialized")
@@ -42,6 +44,7 @@ func (c *PostgresCtlConfig) DataDir() string {
 	return c.PostgresConfig.DataDir
 }
 
+// SocketDir returns the PostgreSQL Unix socket directory path from the configuration
 func (c *PostgresCtlConfig) SocketDir() string {
 	if c.PostgresConfig == nil {
 		panic("PostgresConfig is nil - config not properly initialized")
@@ -49,6 +52,7 @@ func (c *PostgresCtlConfig) SocketDir() string {
 	return c.PostgresConfig.UnixSocketDirectories
 }
 
+// ConfigFile returns the PostgreSQL configuration file path from the configuration
 func (c *PostgresCtlConfig) ConfigFile() string {
 	if c.PostgresConfig == nil {
 		panic("PostgresConfig is nil - config not properly initialized")
@@ -56,6 +60,7 @@ func (c *PostgresCtlConfig) ConfigFile() string {
 	return c.PostgresConfig.Path
 }
 
+// ListenAddresses returns the PostgreSQL listen addresses from the configuration
 func (c *PostgresCtlConfig) ListenAddresses() string {
 	if c.PostgresConfig == nil {
 		panic("PostgresConfig is nil - config not properly initialized")
@@ -63,6 +68,7 @@ func (c *PostgresCtlConfig) ListenAddresses() string {
 	return c.PostgresConfig.ListenAddresses
 }
 
+// ClusterName returns the PostgreSQL cluster name from the configuration
 func (c *PostgresCtlConfig) ClusterName() string {
 	if c.PostgresConfig == nil {
 		panic("PostgresConfig is nil - config not properly initialized")
@@ -70,6 +76,7 @@ func (c *PostgresCtlConfig) ClusterName() string {
 	return c.PostgresConfig.ClusterName
 }
 
+// HbaFile returns the PostgreSQL host-based authentication file path from the configuration
 func (c *PostgresCtlConfig) HbaFile() string {
 	if c.PostgresConfig == nil {
 		panic("PostgresConfig is nil - config not properly initialized")
@@ -77,6 +84,7 @@ func (c *PostgresCtlConfig) HbaFile() string {
 	return c.PostgresConfig.HbaFile
 }
 
+// IdentFile returns the PostgreSQL ident authentication file path from the configuration
 func (c *PostgresCtlConfig) IdentFile() string {
 	if c.PostgresConfig == nil {
 		panic("PostgresConfig is nil - config not properly initialized")
@@ -84,6 +92,7 @@ func (c *PostgresCtlConfig) IdentFile() string {
 	return c.PostgresConfig.IdentFile
 }
 
+// MaxConnections returns the PostgreSQL maximum connections setting from the configuration
 func (c *PostgresCtlConfig) MaxConnections() int {
 	if c.PostgresConfig == nil {
 		panic("PostgresConfig is nil - config not properly initialized")

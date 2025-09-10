@@ -82,9 +82,9 @@ func TestPostgresBaseDir(t *testing.T) {
 	poolerDir = tempDir
 
 	expected := tempDir + "/pg"
-	result := PostgresBaseDir()
+	result := PostgresDataDir()
 
-	assert.Equal(t, expected, result, "PostgresBaseDir should return expected path")
+	assert.Equal(t, expected, result, "PostgresDataDir should return expected path")
 }
 
 func TestPostgresConfigFile(t *testing.T) {

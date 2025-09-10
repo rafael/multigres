@@ -52,7 +52,7 @@ func TempDir(t *testing.T, prefix string) (string, func()) {
 func CreateDataDir(t *testing.T, baseDir string, initialized bool) string {
 	t.Helper()
 
-	dataDir := filepath.Join(baseDir, "data")
+	dataDir := filepath.Join(baseDir)
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		t.Fatalf("Failed to create data dir: %v", err)
 	}

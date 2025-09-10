@@ -64,15 +64,13 @@ func GeneratePostgresServerConfig(poolerId string, port int) (*PostgresServerCon
 	if poolerDir == "" {
 		return nil, fmt.Errorf("--pooler-dir needs to be set to generate postgres server config")
 	}
-	configPath := PostgresConfigFile()
-	baseDir := PostgresBaseDir()
 
 	// Create minimal config for template generation
 	cnf := &PostgresServerConfig{}
-	cnf.Path = configPath
-	cnf.DataDir = baseDir
-	cnf.HbaFile = path.Join(baseDir, "pg_hba.conf")
-	cnf.IdentFile = path.Join(baseDir, "pg_ident.conf")
+	cnf.Path = PostgresConfigFile()
+	cnf.DataDir = PostgresDataDir()
+	cnf.HbaFile = path.Join(PostgresConfigDataDir(), "pg_hba.conf")
+	cnf.IdentFile = path.Join(PostgresConfigDataDir(), "pg_ident.conf")
 	cnf.Port = port
 	cnf.ListenAddresses = "localhost"
 	cnf.UnixSocketDirectories = "/tmp"
@@ -101,14 +99,14 @@ func LoadOrCreatePostgresServerConfig(poolerId string, port int) (*PostgresServe
 		return ReadPostgresServerConfig(cnf, 0)
 	}
 
-	// Config file doesn't exist, generate and write it
+	// Config file doesn't exist, let's generate it
 	return GeneratePostgresServerConfig(poolerId, port)
 }
 
 // generateConfigFile creates the postgresql.conf file using the embedded template
 func (cnf *PostgresServerConfig) generateConfigFile() error {
 	// Ensure directory exists
-	if err := os.MkdirAll(path.Dir(cnf.Path), 0755); err != nil {
+	if err := os.MkdirAll(path.Dir(cnf.Path), 0o755); err != nil {
 		return err
 	}
 
@@ -119,17 +117,22 @@ func (cnf *PostgresServerConfig) generateConfigFile() error {
 	}
 
 	// Write to file
-	return os.WriteFile(cnf.Path, []byte(content), 0644)
+	return os.WriteFile(cnf.Path, []byte(content), 0o644)
 }
 
-// PostgresBaseDir returns the default location of the postgresql.conf file.
-func PostgresBaseDir() string {
-	return path.Join(poolerDir, "pg")
+// PostgresDataDir returns the default location of the postgresql.conf file.
+func PostgresDataDir() string {
+	return path.Join(poolerDir, "pg_data")
+}
+
+// PostgresConfigDataDir returns the default location of the postgresql.conf file.
+func PostgresConfigDataDir() string {
+	return path.Join(poolerDir, "pg_config")
 }
 
 // PostgresConfigFile returns the default location of the postgresql.conf file.
 func PostgresConfigFile() string {
-	return path.Join(PostgresBaseDir(), "postgresql.conf")
+	return path.Join(PostgresConfigDataDir(), "postgresql.conf")
 }
 
 // MakePostgresConf will substitute values in the template

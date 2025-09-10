@@ -184,7 +184,7 @@ func TestReadPostgresServerConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "postgresql.conf")
 
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err, "Failed to write test config file")
 
 	// Create config struct and read the file
@@ -214,7 +214,7 @@ func TestReadPostgresServerConfigEmptyFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "empty.conf")
 
-	err := os.WriteFile(configPath, []byte(""), 0644)
+	err := os.WriteFile(configPath, []byte(""), 0o644)
 	require.NoError(t, err, "Failed to write empty config file")
 
 	// Create config struct and read the file
@@ -240,7 +240,7 @@ func TestReadPostgresServerConfigCommentsOnly(t *testing.T) {
 #max_connections = 50
 `
 
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err, "Failed to write comments-only config file")
 
 	// Create config struct and read the file
