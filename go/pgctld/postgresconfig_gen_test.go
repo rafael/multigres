@@ -44,7 +44,7 @@ func TestNewPostgresServerConfig(t *testing.T) {
 			port:        5432,
 			wantPort:    5432,
 			wantCluster: "test-pooler-1",
-			wantDataDir: tempDir + "/pg",
+			wantDataDir: tempDir + "/pg_data",
 		},
 		{
 			name:        "custom port",
@@ -52,7 +52,7 @@ func TestNewPostgresServerConfig(t *testing.T) {
 			port:        5433,
 			wantPort:    5433,
 			wantCluster: "pooler-2",
-			wantDataDir: tempDir + "/pg",
+			wantDataDir: tempDir + "/pg_data",
 		},
 	}
 
@@ -81,7 +81,7 @@ func TestPostgresBaseDir(t *testing.T) {
 	defer func() { poolerDir = originalPoolerDir }()
 	poolerDir = tempDir
 
-	expected := tempDir + "/pg"
+	expected := tempDir + "/pg_data"
 	result := PostgresDataDir()
 
 	assert.Equal(t, expected, result, "PostgresDataDir should return expected path")
@@ -94,7 +94,7 @@ func TestPostgresConfigFile(t *testing.T) {
 	defer func() { poolerDir = originalPoolerDir }()
 	poolerDir = tempDir
 
-	expected := tempDir + "/pg/postgresql.conf"
+	expected := tempDir + "/pg_data/postgresql.conf"
 	result := PostgresConfigFile()
 
 	assert.Equal(t, expected, result, "PostgresConfigFile should return expected path")
@@ -129,7 +129,7 @@ func TestMakePostgresConf(t *testing.T) {
 		{
 			name:     "data directory template",
 			template: "data_directory = '{{.DataDir}}'",
-			want:     []string{"data_directory = '" + tempDir + "/pg'"},
+			want:     []string{"data_directory = '" + tempDir + "/pg_data'"},
 		},
 		{
 			name:     "max connections template",
@@ -159,7 +159,7 @@ unix_socket_directories = '{{.UnixSocketDirectories}}'`,
 				"port = 5432",
 				"max_connections = 500",
 				"listen_addresses = 'localhost'",
-				"data_directory = '" + tempDir + "/pg'",
+				"data_directory = '" + tempDir + "/pg_data'",
 				"cluster_name = 'test-pooler'",
 				"unix_socket_directories = '/tmp'",
 				"# PostgreSQL Configuration",

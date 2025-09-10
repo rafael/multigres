@@ -76,6 +76,18 @@ func (cnf *PostgresServerConfig) lookupInt(key string) (int, error) {
 	return ival, nil
 }
 
+// stripQuotes removes surrounding single or double quotes from a string value
+func stripQuotes(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) >= 2 {
+		if (strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) ||
+			(strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) {
+			return value[1 : len(value)-1]
+		}
+	}
+	return value
+}
+
 // ReadPostgresServerConfig reads an existing postgresql.conf from disk and updates the passed in PostgresServerConfig object
 // with values from the config file on disk.
 func ReadPostgresServerConfig(pgConfig *PostgresServerConfig, waitTime time.Duration) (*PostgresServerConfig, error) {
@@ -118,14 +130,14 @@ func ReadPostgresServerConfig(pgConfig *PostgresServerConfig, waitTime time.Dura
 			parts := strings.SplitN(lineStr, "=", 2)
 			if len(parts) == 2 {
 				key = strings.TrimSpace(parts[0])
-				value = strings.TrimSpace(parts[1])
+				value = stripQuotes(strings.TrimSpace(parts[1]))
 			}
 		} else {
 			// Handle format without = (space separated)
 			parts := strings.Fields(lineStr)
 			if len(parts) >= 2 {
 				key = parts[0]
-				value = strings.Join(parts[1:], " ")
+				value = stripQuotes(strings.Join(parts[1:], " "))
 			}
 		}
 

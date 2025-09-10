@@ -267,14 +267,8 @@ func (s *PgCtldService) Version(ctx context.Context, req *pb.VersionRequest) (*p
 func (s *PgCtldService) InitDataDir(ctx context.Context, req *pb.InitDataDirRequest) (*pb.InitDataDirResponse, error) {
 	s.logger.Info("gRPC InitDataDir request")
 
-	// Create config from request parameters
-	config, err := pgctld.LoadOrCreatePostgresServerConfig("default", pgPort)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load or create PostgresServerConfig: %w", err)
-	}
-
 	// Use the shared init function with detailed result
-	result, err := InitDataDirWithResult(config)
+	result, err := InitDataDirWithResult(pgctld.PostgresDataDir())
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize data directory: %w", err)
 	}

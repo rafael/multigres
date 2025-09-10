@@ -69,8 +69,8 @@ func GeneratePostgresServerConfig(poolerId string, port int) (*PostgresServerCon
 	cnf := &PostgresServerConfig{}
 	cnf.Path = PostgresConfigFile()
 	cnf.DataDir = PostgresDataDir()
-	cnf.HbaFile = path.Join(PostgresConfigDataDir(), "pg_hba.conf")
-	cnf.IdentFile = path.Join(PostgresConfigDataDir(), "pg_ident.conf")
+	cnf.HbaFile = path.Join(PostgresDataDir(), "pg_hba.conf")
+	cnf.IdentFile = path.Join(PostgresDataDir(), "pg_ident.conf")
 	cnf.Port = port
 	cnf.ListenAddresses = "localhost"
 	cnf.UnixSocketDirectories = "/tmp"
@@ -125,14 +125,9 @@ func PostgresDataDir() string {
 	return path.Join(poolerDir, "pg_data")
 }
 
-// PostgresConfigDataDir returns the default location of the postgresql.conf file.
-func PostgresConfigDataDir() string {
-	return path.Join(poolerDir, "pg_config")
-}
-
 // PostgresConfigFile returns the default location of the postgresql.conf file.
 func PostgresConfigFile() string {
-	return path.Join(PostgresConfigDataDir(), "postgresql.conf")
+	return path.Join(PostgresDataDir(), "postgresql.conf")
 }
 
 // MakePostgresConf will substitute values in the template

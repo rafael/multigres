@@ -263,3 +263,61 @@ func TestReadPostgresServerConfigFileNotFound(t *testing.T) {
 	_, err := ReadPostgresServerConfig(config, 0)
 	assert.Error(t, err, "ReadPostgresServerConfig should return error for non-existent file")
 }
+
+func TestReadPostgresServerConfigQuoteRemoval(t *testing.T) {
+	// Test that quoted values have their quotes removed
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "quoted.conf")
+
+	configContent := `
+# Test single quotes
+data_directory = 'multigres_local/test-rafa/pg_data'
+cluster_name = 'test_cluster'
+listen_addresses = 'localhost'
+
+# Test double quotes  
+hba_file = "/etc/postgresql/pg_hba.conf"
+ident_file = "/etc/postgresql/pg_ident.conf"
+unix_socket_directories = "/var/run/postgresql"
+
+# Test without quotes (should remain unchanged)
+port = 5432
+max_connections = 200
+
+# Test mixed formats
+ssl_cert_file = 'server.crt'
+ssl_key_file = "server.key"
+
+# Test space-separated format (without =)
+shared_preload_libraries 'pg_stat_statements, auto_explain'
+`
+
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
+	require.NoError(t, err, "Failed to write quoted config file")
+
+	// Create config struct and read the file
+	config := &PostgresServerConfig{Path: configPath}
+	result, err := ReadPostgresServerConfig(config, 0)
+	require.NoError(t, err, "ReadPostgresServerConfig should not return error")
+
+	// Test that single quotes were removed
+	assert.Equal(t, "multigres_local/test-rafa/pg_data", result.DataDir, "Single quotes should be removed from data_directory")
+	assert.Equal(t, "test_cluster", result.ClusterName, "Single quotes should be removed from cluster_name")
+	assert.Equal(t, "localhost", result.ListenAddresses, "Single quotes should be removed from listen_addresses")
+
+	// Test that double quotes were removed
+	assert.Equal(t, "/etc/postgresql/pg_hba.conf", result.HbaFile, "Double quotes should be removed from hba_file")
+	assert.Equal(t, "/etc/postgresql/pg_ident.conf", result.IdentFile, "Double quotes should be removed from ident_file")
+	assert.Equal(t, "/var/run/postgresql", result.UnixSocketDirectories, "Double quotes should be removed from unix_socket_directories")
+
+	// Test that unquoted values remain unchanged
+	assert.Equal(t, 5432, result.Port, "Unquoted port should remain unchanged")
+	assert.Equal(t, 200, result.MaxConnections, "Unquoted max_connections should remain unchanged")
+
+	// Test mixed quote types
+	assert.Equal(t, "server.crt", result.lookup("ssl_cert_file"), "Single quotes should be removed from ssl_cert_file")
+	assert.Equal(t, "server.key", result.lookup("ssl_key_file"), "Double quotes should be removed from ssl_key_file")
+
+	// Test space-separated format
+	assert.Equal(t, "pg_stat_statements, auto_explain", result.lookup("shared_preload_libraries"), "Single quotes should be removed from space-separated values")
+}

@@ -111,13 +111,13 @@ CLI flags take precedence over config file and environment variable settings.
 
 Examples:
   # Start with default settings
-  pgctld start --pg-data-dir /var/lib/postgresql/data
+  pgctld start --pooler-dir /var/lib/postgresql/data
 
   # Start on custom port
-  pgctld start --pg-data-dir /var/lib/postgresql/data --port 5433
+  pgctld start --pooler-dir /var/lib/postgresql/data --port 5433
 
   # Start with custom socket directory and config file
-  pgctld start --pg-data-dir /var/lib/postgresql/data -s /var/run/postgresql -c /etc/postgresql/custom.conf`,
+  pgctld start --pooler-dir /var/lib/postgresql/data -s /var/run/postgresql -c /etc/postgresql/custom.conf`,
 	RunE: runStart,
 }
 
