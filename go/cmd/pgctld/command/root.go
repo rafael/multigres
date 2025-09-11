@@ -49,6 +49,25 @@ func validateGlobalFlags(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// validateInitialized validates that the PostgreSQL data directory has been initialized
+// This should be called by all commands except 'init'
+func validateInitialized(cmd *cobra.Command, args []string) error {
+	// First run the standard global validation
+	if err := validateGlobalFlags(cmd, args); err != nil {
+		return err
+	}
+
+	// Check if data directory is initialized
+	poolerDir := pgctld.GetPoolerDir()
+
+	if !pgctld.IsDataDirInitialized(poolerDir) {
+		dataDir := pgctld.PostgresDataDir(poolerDir)
+		return fmt.Errorf("data directory not initialized: %s. Run 'pgctld init' first", dataDir)
+	}
+
+	return nil
+}
+
 // Root represents the base command when called without any subcommands
 var Root = &cobra.Command{
 	Use:   "pgctld",
@@ -63,7 +82,6 @@ func init() {
 	servenv.RegisterServiceCmd(Root)
 	servenv.InitServiceMap("grpc", "pgctld")
 	Root.PersistentFlags().StringVarP(&pgHost, "pg-host", "H", pgHost, "PostgreSQL host")
-	Root.PersistentFlags().IntVarP(&pgPort, "pg-port", "p", pgPort, "PostgreSQL port")
 	Root.PersistentFlags().StringVarP(&pgDatabase, "pg-database", "D", pgDatabase, "PostgreSQL database name")
 	Root.PersistentFlags().StringVarP(&pgUser, "pg-user", "U", pgUser, "PostgreSQL username")
 	Root.PersistentFlags().StringVar(&pgPassword, "pg-password", pgPassword, "PostgreSQL password")

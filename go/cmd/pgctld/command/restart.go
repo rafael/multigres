@@ -58,7 +58,7 @@ Examples:
 
   # Restart with immediate stop and custom socket directory
   pgctld restart -d /data --mode immediate -s /var/run/postgresql`,
-	PreRunE: validateGlobalFlags,
+	PreRunE: validateInitialized,
 	RunE:    runRestart,
 }
 

@@ -14,7 +14,11 @@
 
 package pgctld
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+)
 
 // PostgresCtlConfig holds all PostgreSQL control configuration parameters
 // It contains a PostgresServerConfig for all PostgreSQL-specific settings
@@ -62,4 +66,13 @@ func NewPostgresCtlConfig(host string, port int, user, database, password string
 		PostgresConfigFile: postgresConfigFile,
 		PoolerDir:          poolerDir,
 	}, nil
+}
+
+// IsDataDirInitialized checks if a PostgreSQL data directory has been initialized
+func IsDataDirInitialized(poolerDir string) bool {
+	// Check if PG_VERSION file exists (indicates initialized data directory)
+	dataDir := PostgresDataDir(poolerDir)
+	pgVersionFile := filepath.Join(dataDir, "PG_VERSION")
+	_, err := os.Stat(pgVersionFile)
+	return err == nil
 }

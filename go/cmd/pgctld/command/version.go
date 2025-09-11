@@ -57,7 +57,7 @@ Examples:
   if pgctld version | grep -q "PostgreSQL 15"; then
     echo "Compatible version found"
   fi`,
-	PreRunE: validateGlobalFlags,
+	PreRunE: validateInitialized,
 	RunE:    runVersion,
 }
 

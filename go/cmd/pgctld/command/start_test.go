@@ -105,7 +105,7 @@ func TestRunStart(t *testing.T) {
 				require.NoError(t, err)
 
 				// Verify data directory was initialized
-				assert.True(t, isDataDirInitialized(dataDir), "Data directory should be initialized")
+				assert.True(t, pgctld.IsDataDirInitialized(dataDir), "Data directory should be initialized")
 			}
 		})
 	}
@@ -150,7 +150,7 @@ func TestIsDataDirInitialized(t *testing.T) {
 			defer cleanupPooler()
 
 			dataDir := tt.setupDir(baseDir)
-			result := isDataDirInitialized(dataDir)
+			result := pgctld.IsDataDirInitialized(dataDir)
 			assert.Equal(t, tt.initialized, result)
 		})
 	}

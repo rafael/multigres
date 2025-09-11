@@ -7,7 +7,3 @@ unix_socket_directories = '{{.UnixSocketDirectories}}'
 
 # These are defaults that are sensible for all configurations
 max_connections = 500
-
-
-
-

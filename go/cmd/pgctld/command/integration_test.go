@@ -72,7 +72,17 @@ timeout: 30
 	require.NoError(t, err, "Failed to build pgctld binary: %v\nOutput: %s", err, string(buildOutput))
 
 	t.Run("complete_lifecycle_via_cli", func(t *testing.T) {
-		// Step 1: Initial status - should be not initialized
+		// Step 1: Initialize the database first
+		initCmd := exec.Command(pgctldBinary, "init", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
+		initCmd.Env = append(os.Environ(),
+			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
+		initOutput, err := initCmd.CombinedOutput()
+		if err != nil {
+			t.Logf("initCmd.Output() error: %v, output: %s", err, string(initOutput))
+		}
+		require.NoError(t, err)
+
+		// Step 2: Check status - should be stopped after init
 		statusCmd := exec.Command(pgctldBinary, "status", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 		statusCmd.Env = append(os.Environ(),
 			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
@@ -81,16 +91,16 @@ timeout: 30
 			t.Logf("statusCmd.Output() error: %v, output: %s", err, string(output))
 		}
 		require.NoError(t, err)
-		assert.Contains(t, string(output), "Not initialized")
+		assert.Contains(t, string(output), "Stopped")
 
-		// Step 2: Start PostgreSQL (should initialize and start)
+		// Step 3: Start PostgreSQL
 		startCmd := exec.Command(pgctldBinary, "start", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 		startCmd.Env = append(os.Environ(),
 			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
 		err = startCmd.Run()
 		require.NoError(t, err)
 
-		// Step 3: Check status - should be running
+		// Step 4: Check status - should be running
 		statusCmd = exec.Command(pgctldBinary, "status", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 		statusCmd.Env = append(os.Environ(),
 			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
@@ -98,21 +108,21 @@ timeout: 30
 		require.NoError(t, err)
 		assert.Contains(t, string(output), "Running")
 
-		// Step 4: Reload configuration
+		// Step 5: Reload configuration
 		reloadCmd := exec.Command(pgctldBinary, "reload-config", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 		reloadCmd.Env = append(os.Environ(),
 			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
 		err = reloadCmd.Run()
 		require.NoError(t, err)
 
-		// Step 5: Restart PostgreSQL
+		// Step 6: Restart PostgreSQL
 		restartCmd := exec.Command(pgctldBinary, "restart", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 		restartCmd.Env = append(os.Environ(),
 			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
 		err = restartCmd.Run()
 		require.NoError(t, err)
 
-		// Step 6: Check status again - should still be running
+		// Step 7: Check status again - should still be running
 		statusCmd = exec.Command(pgctldBinary, "status", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 		statusCmd.Env = append(os.Environ(),
 			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
@@ -120,14 +130,14 @@ timeout: 30
 		require.NoError(t, err)
 		assert.Contains(t, string(output), "Running")
 
-		// Step 7: Stop PostgreSQL
+		// Step 8: Stop PostgreSQL
 		stopCmd := exec.Command(pgctldBinary, "stop", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 		stopCmd.Env = append(os.Environ(),
 			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
 		err = stopCmd.Run()
 		require.NoError(t, err)
 
-		// Step 8: Final status check - should be stopped
+		// Step 9: Final status check - should be stopped
 		statusCmd = exec.Command(pgctldBinary, "status", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 		statusCmd.Env = append(os.Environ(),
 			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
@@ -169,7 +179,14 @@ timeout: 30
 	err = buildCmd.Run()
 	require.NoError(t, err, "Failed to build pgctld binary")
 
-	// Initialize once via CLI
+	// Initialize database first
+	initCmd := exec.Command(pgctldBinary, "init", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
+	initCmd.Env = append(os.Environ(),
+		"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
+	err = initCmd.Run()
+	require.NoError(t, err)
+
+	// Start PostgreSQL for the first time
 	startCmd := exec.Command(pgctldBinary, "start", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 	startCmd.Env = append(os.Environ(),
 		"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
@@ -252,7 +269,14 @@ timeout: 30
 	err = buildCmd.Run()
 	require.NoError(t, err, "Failed to build pgctld binary")
 
-	// Initialize and start PostgreSQL
+	// Initialize database first
+	initCmd := exec.Command(pgctldBinary, "init", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
+	initCmd.Env = append(os.Environ(),
+		"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
+	err = initCmd.Run()
+	require.NoError(t, err)
+
+	// Start PostgreSQL
 	startCmd := exec.Command(pgctldBinary, "start", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 	startCmd.Env = append(os.Environ(),
 		"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))

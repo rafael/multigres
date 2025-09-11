@@ -37,13 +37,23 @@ type StartResult struct {
 	PID            int
 	AlreadyRunning bool
 	Message        string
-	WasInitialized bool
 }
 
-// NewPostgresCtlConfigFromDefaults creates a PostgresCtlConfig with default values and viper fallbacks
+// NewPostgresCtlConfigFromDefaults creates a PostgresCtlConfig by reading from existing postgresql.conf
 func NewPostgresCtlConfigFromDefaults() (*pgctld.PostgresCtlConfig, error) {
 	poolerDir := pgctld.GetPoolerDir()
-	config, err := pgctld.NewPostgresCtlConfig(pgHost, pgPort, pgUser, pgDatabase, pgPassword, timeout, pgctld.PostgresDataDir(poolerDir), pgctld.PostgresConfigFile(poolerDir), poolerDir)
+	postgresConfigFile := pgctld.PostgresConfigFile(poolerDir)
+
+	// Read existing port from postgresql.conf - file must exist
+	existingConfig, err := pgctld.ReadPostgresServerConfig(&pgctld.PostgresServerConfig{
+		Path: postgresConfigFile,
+	}, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read existing postgresql.conf at %s: %w", postgresConfigFile, err)
+	}
+
+	effectivePort := existingConfig.Port
+	config, err := pgctld.NewPostgresCtlConfig(pgHost, effectivePort, pgUser, pgDatabase, pgPassword, timeout, pgctld.PostgresDataDir(poolerDir), postgresConfigFile, poolerDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
@@ -72,7 +82,7 @@ Examples:
 
   # Start with custom socket directory and config file
   pgctld start --pooler-dir /var/lib/postgresql/data -s /var/run/postgresql -c /etc/postgresql/custom.conf`,
-	PreRunE: validateGlobalFlags,
+	PreRunE: validateInitialized,
 	RunE:    runStart,
 }
 
@@ -92,9 +102,6 @@ func runStart(cmd *cobra.Command, args []string) error {
 		fmt.Printf("PostgreSQL is already running (PID: %d)\n", result.PID)
 	} else {
 		fmt.Printf("PostgreSQL server started successfully (PID: %d)\n", result.PID)
-		if !result.WasInitialized {
-			fmt.Println("Data directory was initialized")
-		}
 	}
 
 	return nil
@@ -104,22 +111,6 @@ func runStart(cmd *cobra.Command, args []string) error {
 func StartPostgreSQLWithResult(config *pgctld.PostgresCtlConfig) (*StartResult, error) {
 	logger := slog.Default()
 	result := &StartResult{}
-
-	// Check if data directory exists and is initialized
-	wasInitialized := isDataDirInitialized(config.PostgresDataDir)
-	result.WasInitialized = wasInitialized
-
-	if !wasInitialized {
-		logger.Info("Data directory not initialized, running initdb", "data_dir", config.PostgresDataDir)
-		if err := initializeDataDir(config.PostgresDataDir); err != nil {
-			return nil, fmt.Errorf("failed to initialize data directory: %w", err)
-		}
-
-		_, err := pgctld.GeneratePostgresServerConfig(config.PoolerDir, config.Port)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create postgres config: %w", err)
-		}
-	}
 
 	// Check if PostgreSQL is already running
 	if isPostgreSQLRunning(config.PostgresDataDir) {
@@ -170,13 +161,6 @@ func StartPostgreSQLWithConfig(config *pgctld.PostgresCtlConfig) error {
 	}
 
 	return nil
-}
-
-func isDataDirInitialized(dataDir string) bool {
-	// Check if PG_VERSION file exists (indicates initialized data directory)
-	pgVersionFile := filepath.Join(dataDir, "PG_VERSION")
-	_, err := os.Stat(pgVersionFile)
-	return err == nil
 }
 
 func initializeDataDir(dataDir string) error {

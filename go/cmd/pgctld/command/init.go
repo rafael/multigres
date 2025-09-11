@@ -33,6 +33,7 @@ func init() {
 	Root.AddCommand(initCmd)
 
 	// Add init-specific flags
+	initCmd.Flags().IntVarP(&pgPort, "pg-port", "p", pgPort, "PostgreSQL port")
 }
 
 var initCmd = &cobra.Command{
@@ -66,7 +67,7 @@ func InitDataDirWithResult(poolerDir string) (*InitResult, error) {
 	dataDir := pgctld.PostgresDataDir(poolerDir)
 
 	// Check if data directory is already initialized
-	if isDataDirInitialized(dataDir) {
+	if pgctld.IsDataDirInitialized(poolerDir) {
 		logger.Info("Data directory is already initialized", "data_dir", dataDir)
 		result.AlreadyInitialized = true
 		result.Message = "Data directory is already initialized"

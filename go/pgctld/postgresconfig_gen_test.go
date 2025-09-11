@@ -43,7 +43,7 @@ func TestNewPostgresServerConfig(t *testing.T) {
 			poolerId:    "test-pooler-1",
 			port:        5432,
 			wantPort:    5432,
-			wantCluster: "test-pooler-1",
+			wantCluster: "default",
 			wantDataDir: tempDir + "/pg_data",
 		},
 		{
@@ -51,14 +51,14 @@ func TestNewPostgresServerConfig(t *testing.T) {
 			poolerId:    "pooler-2",
 			port:        5433,
 			wantPort:    5433,
-			wantCluster: "pooler-2",
+			wantCluster: "default",
 			wantDataDir: tempDir + "/pg_data",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config, err := GeneratePostgresServerConfig(tt.poolerId, tt.port)
+			config, err := GeneratePostgresServerConfig(tempDir, tt.port)
 			require.NoError(t, err, "GeneratePostgresServerConfig should not return error")
 
 			assert.Equal(t, tt.wantPort, config.Port, "Port should match expected value")
@@ -124,7 +124,7 @@ func TestMakePostgresConf(t *testing.T) {
 		{
 			name:     "cluster name template",
 			template: "cluster_name = '{{.ClusterName}}'",
-			want:     []string{"cluster_name = 'test-pooler'"},
+			want:     []string{"cluster_name = 'default'"},
 		},
 		{
 			name:     "data directory template",
@@ -160,7 +160,7 @@ unix_socket_directories = '{{.UnixSocketDirectories}}'`,
 				"max_connections = 500",
 				"listen_addresses = 'localhost'",
 				"data_directory = '" + tempDir + "/pg_data'",
-				"cluster_name = 'test-pooler'",
+				"cluster_name = 'default'",
 				"unix_socket_directories = '/tmp'",
 				"# PostgreSQL Configuration",
 			},

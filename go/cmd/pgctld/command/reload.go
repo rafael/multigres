@@ -57,7 +57,7 @@ Examples:
 
   # Reload configuration for specific instance
   pgctld reload-config -d /var/lib/postgresql/instance2/data`,
-	PreRunE: validateGlobalFlags,
+	PreRunE: validateInitialized,
 	RunE:    runReload,
 }
 

@@ -64,7 +64,7 @@ Examples:
 
   # Force immediate stop with short timeout
   pgctld stop --pg-data-dir /var/lib/postgresql/data --mode immediate --timeout 10`,
-	PreRunE: validateGlobalFlags,
+	PreRunE: validateInitialized,
 	RunE:    runStop,
 }
 

@@ -1,18 +1,16 @@
-/*
-Copyright 2025 The Multigres Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2025 The Multigres Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package command
 
@@ -71,7 +69,7 @@ Examples:
   # Check status of multiple instances
   pgctld status -d /var/lib/poolerdir/instance1 -p 5432
   pgctld status -d /var/lib/poolerdir/instance2 -p 5433`,
-	PreRunE: validateGlobalFlags,
+	PreRunE: validateInitialized,
 	RunE:    runStatus,
 }
 
@@ -82,13 +80,6 @@ func GetStatusWithResult(config *pgctld.PostgresCtlConfig) (*StatusResult, error
 		DataDir: config.PostgresDataDir,
 		Port:    config.Port,
 		Host:    config.Host,
-	}
-
-	// Check if data directory is initialized
-	if !isDataDirInitialized(config.PostgresDataDir) {
-		result.Status = "NOT_INITIALIZED"
-		result.Message = "Data directory is not initialized"
-		return result, nil
 	}
 
 	// Check if PostgreSQL is running
@@ -139,8 +130,6 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	// Display status for CLI users
 	var statusDisplay string
 	switch result.Status {
-	case "NOT_INITIALIZED":
-		statusDisplay = "Not initialized"
 	case "STOPPED":
 		statusDisplay = "Stopped"
 	case "RUNNING":
@@ -153,8 +142,6 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Data directory: %s", result.DataDir)
 
 	switch result.Status {
-	case "NOT_INITIALIZED":
-		fmt.Printf(" (not initialized)\n")
 	case "STOPPED":
 		fmt.Printf("\n")
 	case "RUNNING":

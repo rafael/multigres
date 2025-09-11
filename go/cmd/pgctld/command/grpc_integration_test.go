@@ -332,6 +332,81 @@ func TestGRPCWithDifferentConfigurations(t *testing.T) {
 	})
 }
 
+// TestGRPCUninitializedDatabase tests gRPC behavior with uninitialized database
+func TestGRPCUninitializedDatabase(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping gRPC integration tests in short mode")
+	}
+
+	tempDir, cleanup := testutil.TempDir(t, "pgctld_grpc_uninitialized_test")
+	defer cleanup()
+
+	dataDir := filepath.Join(tempDir, "data")
+
+	// Setup mock PostgreSQL binaries
+	binDir := filepath.Join(tempDir, "bin")
+	err := os.MkdirAll(binDir, 0o755)
+	require.NoError(t, err)
+	testutil.CreateMockPostgreSQLBinaries(t, binDir)
+
+	// Create and start gRPC server
+	lis, cleanupServer := createTestGRPCServer(t, dataDir, binDir)
+	defer cleanupServer()
+
+	// Connect to the gRPC server
+	conn, err := grpc.NewClient(lis.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+	defer conn.Close()
+
+	client := pb.NewPgCtldClient(conn)
+
+	t.Run("uninitialized_database_operations", func(t *testing.T) {
+		ctx := context.Background()
+
+		// Step 1: Check initial status - should be NOT_INITIALIZED
+		statusResp, err := client.Status(ctx, &pb.StatusRequest{})
+		require.NoError(t, err)
+		assert.Equal(t, pb.ServerStatus_NOT_INITIALIZED, statusResp.GetStatus())
+		assert.Equal(t, "Data directory is not initialized", statusResp.GetMessage())
+
+		// Step 2: Try to start without initialization - should fail with proper error
+		_, err = client.Start(ctx, &pb.StartRequest{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "data directory not initialized")
+		assert.Contains(t, err.Error(), "Run 'pgctld init' first")
+
+		// Step 3: Try to stop without initialization - should return appropriate message
+		stopResp, err := client.Stop(ctx, &pb.StopRequest{Mode: "fast"})
+		if err != nil {
+			// If it errors, should be about not being initialized or not running
+			assert.Contains(t, err.Error(), "not initialized")
+		} else {
+			// If it succeeds, should indicate it's not running
+			assert.Contains(t, stopResp.GetMessage(), "not running")
+		}
+
+		// Step 4: Try restart without initialization - should fail
+		_, err = client.Restart(ctx, &pb.RestartRequest{Mode: "fast"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "data directory not initialized")
+
+		// Step 5: Try reload config without initialization - should fail
+		_, err = client.ReloadConfig(ctx, &pb.ReloadConfigRequest{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not initialized")
+
+		// Step 6: Initialize should work
+		initResp, err := client.InitDataDir(ctx, &pb.InitDataDirRequest{})
+		require.NoError(t, err)
+		assert.Contains(t, initResp.GetMessage(), "initialized successfully")
+
+		// Step 7: Status should now show STOPPED
+		statusResp, err = client.Status(ctx, &pb.StatusRequest{})
+		require.NoError(t, err)
+		assert.Equal(t, pb.ServerStatus_STOPPED, statusResp.GetStatus())
+	})
+}
+
 // createTestGRPCServer creates and starts a gRPC server for testing
 // Returns the server, listener, and a cleanup function
 func createTestGRPCServer(t *testing.T, dataDir, binDir string) (net.Listener, func()) {

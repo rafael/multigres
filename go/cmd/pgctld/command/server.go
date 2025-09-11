@@ -38,7 +38,8 @@ func validateServerFlags(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Then run our global validation
+	// Then run our global validation (but not initialization validation -
+	// the gRPC server should start and validate initialization per method)
 	return validateGlobalFlags(cmd, args)
 }
 
@@ -145,6 +146,12 @@ func NewPgCtldService(logger *slog.Logger, postgresDataDir string, postgresConfi
 func (s *PgCtldService) Start(ctx context.Context, req *pb.StartRequest) (*pb.StartResponse, error) {
 	s.logger.Info("gRPC Start request", "port", req.Port)
 
+	// Check if data directory is initialized
+	if !pgctld.IsDataDirInitialized(s.poolerDir) {
+		dataDir := pgctld.PostgresDataDir(s.poolerDir)
+		return nil, fmt.Errorf("data directory not initialized: %s. Run 'pgctld init' first", dataDir)
+	}
+
 	// Create config from request parameters
 	config, err := s.NewPostgresConfigFromStartRequest(req)
 	if err != nil {
@@ -166,6 +173,12 @@ func (s *PgCtldService) Start(ctx context.Context, req *pb.StartRequest) (*pb.St
 func (s *PgCtldService) Stop(ctx context.Context, req *pb.StopRequest) (*pb.StopResponse, error) {
 	s.logger.Info("gRPC Stop request", "mode", req.Mode)
 
+	// Check if data directory is initialized
+	if !pgctld.IsDataDirInitialized(s.poolerDir) {
+		dataDir := pgctld.PostgresDataDir(s.poolerDir)
+		return nil, fmt.Errorf("data directory not initialized: %s. Run 'pgctld init' first", dataDir)
+	}
+
 	// Create config from request parameters
 	config, err := s.NewPostgresConfigFromStopRequest(req)
 	if err != nil {
@@ -185,6 +198,12 @@ func (s *PgCtldService) Stop(ctx context.Context, req *pb.StopRequest) (*pb.Stop
 
 func (s *PgCtldService) Restart(ctx context.Context, req *pb.RestartRequest) (*pb.RestartResponse, error) {
 	s.logger.Info("gRPC Restart request", "mode", req.Mode, "port", req.Port)
+
+	// Check if data directory is initialized
+	if !pgctld.IsDataDirInitialized(s.poolerDir) {
+		dataDir := pgctld.PostgresDataDir(s.poolerDir)
+		return nil, fmt.Errorf("data directory not initialized: %s. Run 'pgctld init' first", dataDir)
+	}
 
 	// Determine the port to use
 	port := pgPort
@@ -217,11 +236,14 @@ func (s *PgCtldService) Restart(ctx context.Context, req *pb.RestartRequest) (*p
 func (s *PgCtldService) ReloadConfig(ctx context.Context, req *pb.ReloadConfigRequest) (*pb.ReloadConfigResponse, error) {
 	s.logger.Info("gRPC ReloadConfig request")
 
+	// Check if data directory is initialized
+	if !pgctld.IsDataDirInitialized(s.poolerDir) {
+		dataDir := pgctld.PostgresDataDir(s.poolerDir)
+		return nil, fmt.Errorf("data directory not initialized: %s. Run 'pgctld init' first", dataDir)
+	}
+
 	// Create config from request parameters
 	config, err := pgctld.NewPostgresCtlConfig(s.pgHost, s.pgPort, s.pgUser, s.pgDatabase, s.pgPassword, s.timeout, s.postgresDataDir, s.postgresConfigFile, s.poolerDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create config: %w", err)
-	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
@@ -240,11 +262,17 @@ func (s *PgCtldService) ReloadConfig(ctx context.Context, req *pb.ReloadConfigRe
 func (s *PgCtldService) Status(ctx context.Context, req *pb.StatusRequest) (*pb.StatusResponse, error) {
 	s.logger.Debug("gRPC Status request")
 
+	// First check if data directory is initialized
+	if !pgctld.IsDataDirInitialized(s.poolerDir) {
+		return &pb.StatusResponse{
+			Status:  pb.ServerStatus_NOT_INITIALIZED,
+			DataDir: pgctld.PostgresDataDir(s.poolerDir),
+			Message: "Data directory is not initialized",
+		}, nil
+	}
+
 	// Create config from request parameters
 	config, err := pgctld.NewPostgresCtlConfig(s.pgHost, s.pgPort, s.pgUser, s.pgDatabase, s.pgPassword, s.timeout, s.postgresDataDir, s.postgresConfigFile, s.poolerDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create config: %w", err)
-	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
@@ -258,8 +286,6 @@ func (s *PgCtldService) Status(ctx context.Context, req *pb.StatusRequest) (*pb.
 	// Convert status string to protobuf enum
 	var status pb.ServerStatus
 	switch result.Status {
-	case "NOT_INITIALIZED":
-		status = pb.ServerStatus_NOT_INITIALIZED
 	case "STOPPED":
 		status = pb.ServerStatus_STOPPED
 	case "RUNNING":
