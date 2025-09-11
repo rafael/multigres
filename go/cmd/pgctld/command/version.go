@@ -77,7 +77,10 @@ func GetVersionWithResult(config *pgctld.PostgresCtlConfig) (*VersionResult, err
 }
 
 func runVersion(cmd *cobra.Command, args []string) error {
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		return err
+	}
 
 	// No local flag overrides needed - all flags are global now
 

@@ -74,9 +74,7 @@ func TestRunStart(t *testing.T) {
 			cleanupViper := SetupTestPgCtldCleanup(t)
 			defer cleanupViper()
 
-			// This is the convention we use in Multigres, for e the pg_data dir
-			pgDataDir := filepath.Join(baseDir, "pg_data")
-			dataDir := tt.setupDataDir(pgDataDir)
+			dataDir := tt.setupDataDir(baseDir)
 
 			// Setup mock binaries if needed
 			if tt.setupBinaries {

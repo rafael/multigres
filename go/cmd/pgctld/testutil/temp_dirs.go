@@ -55,7 +55,7 @@ func CreateDataDir(t *testing.T, baseDir string, initialized bool) string {
 	t.Helper()
 
 	// This is the base location where multigres expects postgres data
-	dataDir := filepath.Join(baseDir, "pg_data")
+	dataDir := pgctld.PostgresDataDir(baseDir)
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		t.Fatalf("Failed to create data dir: %v", err)
 	}
@@ -72,7 +72,7 @@ func CreateDataDir(t *testing.T, baseDir string, initialized bool) string {
 		defer cleanup()
 
 		// Generate a proper postgresql.conf file using the postgresconfig_gen functionality
-		_, err := pgctld.GeneratePostgresServerConfig("test-pooler", 5432)
+		_, err := pgctld.GeneratePostgresServerConfig(baseDir, 5432)
 		if err != nil {
 			t.Fatalf("Failed to generate PostgreSQL config: %v", err)
 		}

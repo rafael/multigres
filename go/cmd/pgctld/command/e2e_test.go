@@ -225,7 +225,10 @@ timeout: 30
 
 		startCmd := exec.Command(pgctldBinary, "start", "--pooler-dir", dataDir, "--pg-port", strconv.Itoa(perfTestPort), "--config-file", pgctldConfigFile)
 		setupTestEnv(startCmd)
-		err = startCmd.Run()
+		startOutput, err := startCmd.CombinedOutput()
+		if err != nil {
+			t.Logf("pgctld start failed with output: %s", string(startOutput))
+		}
 		require.NoError(t, err)
 
 		startupDuration := time.Since(startTime)
@@ -242,18 +245,17 @@ timeout: 30
 	})
 
 	t.Run("multiple_rapid_operations", func(t *testing.T) {
-		// Generate random port for this test
-		rapidTestPort := testutil.GenerateRandomPort()
-		t.Logf("Rapid operations test using port: %d", rapidTestPort)
-
 		// Test rapid start/stop cycles
 		for i := range 3 {
 			t.Logf("Cycle %d", i+1)
 
 			// Start
-			startCmd := exec.Command(pgctldBinary, "start", "--pooler-dir", dataDir, "--pg-port", strconv.Itoa(rapidTestPort), "--config-file", pgctldConfigFile)
+			startCmd := exec.Command(pgctldBinary, "start", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 			setupTestEnv(startCmd)
-			err := startCmd.Run()
+			startOutput, err := startCmd.CombinedOutput()
+			if err != nil {
+				t.Logf("pgctld start failed with error: %v, output: %s", err, string(startOutput))
+			}
 			require.NoError(t, err)
 
 			// Brief wait

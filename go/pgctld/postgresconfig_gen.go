@@ -60,21 +60,20 @@ func SetPoolerDirForTest(testDir string) func() {
 // and writes it to disk using the embedded template, then reads it back.
 // poolerId is used for the cluster name and path generation.
 // port is the port for the PostgreSQL server.
-func GeneratePostgresServerConfig(poolerId string, port int) (*PostgresServerConfig, error) {
+func GeneratePostgresServerConfig(poolerDir string, port int) (*PostgresServerConfig, error) {
+	// Create minimal config for template generation
 	if poolerDir == "" {
 		return nil, fmt.Errorf("--pooler-dir needs to be set to generate postgres server config")
 	}
-
-	// Create minimal config for template generation
 	cnf := &PostgresServerConfig{}
-	cnf.Path = PostgresConfigFile()
-	cnf.DataDir = PostgresDataDir()
-	cnf.HbaFile = path.Join(PostgresDataDir(), "pg_hba.conf")
-	cnf.IdentFile = path.Join(PostgresDataDir(), "pg_ident.conf")
+	cnf.Path = PostgresConfigFile(poolerDir)
+	cnf.DataDir = PostgresDataDir(poolerDir)
+	cnf.HbaFile = path.Join(PostgresDataDir(poolerDir), "pg_hba.conf")
+	cnf.IdentFile = path.Join(PostgresDataDir(poolerDir), "pg_ident.conf")
 	cnf.Port = port
 	cnf.ListenAddresses = "localhost"
 	cnf.UnixSocketDirectories = "/tmp"
-	cnf.ClusterName = poolerId
+	cnf.ClusterName = "default"
 
 	// Generate config file from template
 	if err := cnf.generateConfigFile(); err != nil {
@@ -87,10 +86,9 @@ func GeneratePostgresServerConfig(poolerId string, port int) (*PostgresServerCon
 
 // LoadOrCreatePostgresServerConfig loads an existing PostgreSQL server configuration
 // from disk, or generates and writes a new one if it doesn't exist.
-// poolerId is used for the cluster name and path generation.
 // port is the port for the PostgreSQL server.
-func LoadOrCreatePostgresServerConfig(poolerId string, port int) (*PostgresServerConfig, error) {
-	configPath := PostgresConfigFile()
+func LoadOrCreatePostgresServerConfig(poolerDir string, port int) (*PostgresServerConfig, error) {
+	configPath := PostgresConfigFile(poolerDir)
 
 	// Check if config file already exists
 	if _, err := os.Stat(configPath); err == nil {
@@ -100,7 +98,7 @@ func LoadOrCreatePostgresServerConfig(poolerId string, port int) (*PostgresServe
 	}
 
 	// Config file doesn't exist, let's generate it
-	return GeneratePostgresServerConfig(poolerId, port)
+	return GeneratePostgresServerConfig(poolerDir, port)
 }
 
 // generateConfigFile creates the postgresql.conf file using the embedded template
@@ -121,13 +119,13 @@ func (cnf *PostgresServerConfig) generateConfigFile() error {
 }
 
 // PostgresDataDir returns the default location of the postgresql.conf file.
-func PostgresDataDir() string {
+func PostgresDataDir(poolerDir string) string {
 	return path.Join(poolerDir, "pg_data")
 }
 
 // PostgresConfigFile returns the default location of the postgresql.conf file.
-func PostgresConfigFile() string {
-	return path.Join(PostgresDataDir(), "postgresql.conf")
+func PostgresConfigFile(poolerDir string) string {
+	return path.Join(PostgresDataDir(poolerDir), "postgresql.conf")
 }
 
 // MakePostgresConf will substitute values in the template

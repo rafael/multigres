@@ -29,7 +29,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	pb "github.com/multigres/multigres/go/pb/pgctldservice"
 	"github.com/multigres/multigres/go/pgctld"
 )
 
@@ -42,39 +41,12 @@ type StartResult struct {
 }
 
 // NewPostgresCtlConfigFromDefaults creates a PostgresCtlConfig with default values and viper fallbacks
-func NewPostgresCtlConfigFromDefaults() *pgctld.PostgresCtlConfig {
-	return pgctld.NewPostgresCtlConfig(pgHost, pgPort, pgUser, pgDatabase, pgPassword, timeout)
-}
-
-// NewPostgresConfigFromStartRequest creates a PostgresCtlConfig from a gRPC StartRequest
-func NewPostgresConfigFromStartRequest(req *pb.StartRequest) (*pgctld.PostgresCtlConfig, error) {
-	// Determine the port to use
-	port := pgPort
-	if req.Port > 0 {
-		port = int(req.Port)
+func NewPostgresCtlConfigFromDefaults() (*pgctld.PostgresCtlConfig, error) {
+	poolerDir := pgctld.GetPoolerDir()
+	config, err := pgctld.NewPostgresCtlConfig(pgHost, pgPort, pgUser, pgDatabase, pgPassword, timeout, pgctld.PostgresDataDir(poolerDir), pgctld.PostgresConfigFile(poolerDir), poolerDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
-
-	config := pgctld.NewPostgresCtlConfig(pgHost, port, pgUser, pgDatabase, pgPassword, timeout)
-
-	return config, nil
-}
-
-// NewPostgresConfigFromStopRequest creates a PostgresCtlConfig from a gRPC StopRequest
-func NewPostgresConfigFromStopRequest(req *pb.StopRequest) (*pgctld.PostgresCtlConfig, error) {
-	timeout := timeout
-	if req.Timeout > 0 {
-		timeout = int(req.Timeout)
-	}
-
-	config := pgctld.NewPostgresCtlConfig(pgHost, pgPort, pgUser, pgDatabase, pgPassword, timeout)
-
-	return config, nil
-}
-
-// NewPostgresConfigFromStatusRequest creates a PostgresCtlConfig from a gRPC StatusRequest
-func NewPostgresConfigFromStatusRequest(req *pb.StatusRequest) (*pgctld.PostgresCtlConfig, error) {
-	config := pgctld.NewPostgresCtlConfig(pgHost, pgPort, pgUser, pgDatabase, pgPassword, timeout)
-
 	return config, nil
 }
 
@@ -105,7 +77,10 @@ Examples:
 }
 
 func runStart(cmd *cobra.Command, args []string) error {
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		return err
+	}
 
 	result, err := StartPostgreSQLWithResult(config)
 	if err != nil {
@@ -130,34 +105,30 @@ func StartPostgreSQLWithResult(config *pgctld.PostgresCtlConfig) (*StartResult, 
 	logger := slog.Default()
 	result := &StartResult{}
 
-	if pgctld.PostgresDataDir() == "" {
-		return nil, fmt.Errorf("data directory is required")
-	}
-
 	// Check if data directory exists and is initialized
-	wasInitialized := isDataDirInitialized(pgctld.PostgresDataDir())
+	wasInitialized := isDataDirInitialized(config.PostgresDataDir)
 	result.WasInitialized = wasInitialized
 
 	if !wasInitialized {
-		logger.Info("Data directory not initialized, running initdb", "data_dir", pgctld.PostgresDataDir())
-		if err := initializeDataDir(pgctld.PostgresDataDir()); err != nil {
+		logger.Info("Data directory not initialized, running initdb", "data_dir", config.PostgresDataDir)
+		if err := initializeDataDir(config.PostgresDataDir); err != nil {
 			return nil, fmt.Errorf("failed to initialize data directory: %w", err)
 		}
 
-		_, err := pgctld.GeneratePostgresServerConfig("default", config.Port)
+		_, err := pgctld.GeneratePostgresServerConfig(config.PoolerDir, config.Port)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create postgres config: %w", err)
 		}
 	}
 
 	// Check if PostgreSQL is already running
-	if isPostgreSQLRunning(pgctld.PostgresDataDir()) {
+	if isPostgreSQLRunning(config.PostgresDataDir) {
 		logger.Info("PostgreSQL is already running")
 		result.AlreadyRunning = true
 		result.Message = "PostgreSQL is already running"
 
 		// Get PID of running instance
-		if pid, err := readPostmasterPID(pgctld.PostgresDataDir()); err == nil {
+		if pid, err := readPostmasterPID(config.PostgresDataDir); err == nil {
 			result.PID = pid
 		}
 
@@ -165,7 +136,7 @@ func StartPostgreSQLWithResult(config *pgctld.PostgresCtlConfig) (*StartResult, 
 	}
 
 	// Start PostgreSQL
-	logger.Info("Starting PostgreSQL server", "data_dir", pgctld.PostgresDataDir())
+	logger.Info("Starting PostgreSQL server", "data_dir", config.PostgresDataDir)
 	if err := startPostgreSQLWithConfig(config); err != nil {
 		return nil, fmt.Errorf("failed to start PostgreSQL: %w", err)
 	}
@@ -177,7 +148,7 @@ func StartPostgreSQLWithResult(config *pgctld.PostgresCtlConfig) (*StartResult, 
 	}
 
 	// Get PID of started instance
-	if pid, err := readPostmasterPID(pgctld.PostgresDataDir()); err == nil {
+	if pid, err := readPostmasterPID(config.PostgresDataDir); err == nil {
 		result.PID = pid
 	}
 
@@ -266,13 +237,13 @@ func startPostgreSQLWithConfig(config *pgctld.PostgresCtlConfig) error {
 	// Use pg_ctl to start PostgreSQL properly as a daemon
 	args := []string{
 		"start",
-		"-D", pgctld.PostgresDataDir(),
-		"-o", fmt.Sprintf("-c config_file=%s", pgctld.PostgresConfigFile()),
-		"-l", filepath.Join(pgctld.PostgresDataDir(), "postgresql.log"),
+		"-D", config.PostgresDataDir,
+		"-o", fmt.Sprintf("-c config_file=%s", config.PostgresConfigFile),
+		"-l", filepath.Join(config.PostgresDataDir, "postgresql.log"),
 		"-W", // don't wait - we'll check readiness ourselves
 	}
 
-	slog.Info("Starting PostgreSQL with configuration", "port", config.Port, "dataDir", pgctld.PostgresDataDir(), "configFile", pgctld.PostgresConfigFile())
+	slog.Info("Starting PostgreSQL with configuration", "port", config.Port, "dataDir", config.PostgresDataDir, "configFile", config.PostgresConfigFile)
 
 	cmd := exec.Command("pg_ctl", args...)
 	cmd.Stdout = os.Stdout
@@ -287,7 +258,10 @@ func startPostgreSQLWithConfig(config *pgctld.PostgresCtlConfig) error {
 }
 
 func waitForPostgreSQL() error {
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		return err
+	}
 	return waitForPostgreSQLWithConfig(config)
 }
 

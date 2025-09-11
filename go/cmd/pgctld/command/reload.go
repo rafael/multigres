@@ -66,21 +66,17 @@ func ReloadPostgreSQLConfigWithResult(config *pgctld.PostgresCtlConfig) (*Reload
 	logger := slog.Default()
 	result := &ReloadResult{}
 
-	if pgctld.PostgresDataDir() == "" {
-		return nil, fmt.Errorf("data-dir is required")
-	}
-
 	// Check if PostgreSQL is running
-	if !isPostgreSQLRunning(pgctld.PostgresDataDir()) {
+	if !isPostgreSQLRunning(config.PostgresDataDir) {
 		result.WasRunning = false
 		result.Message = "PostgreSQL is not running"
 		return result, fmt.Errorf("PostgreSQL is not running")
 	}
 
 	result.WasRunning = true
-	logger.Info("Reloading PostgreSQL configuration", "data_dir", pgctld.PostgresDataDir())
+	logger.Info("Reloading PostgreSQL configuration", "data_dir", config.PostgresDataDir)
 
-	if err := reloadPostgreSQLConfig(pgctld.PostgresDataDir()); err != nil {
+	if err := reloadPostgreSQLConfig(config.PostgresDataDir); err != nil {
 		return nil, fmt.Errorf("failed to reload PostgreSQL configuration: %w", err)
 	}
 
@@ -90,7 +86,10 @@ func ReloadPostgreSQLConfigWithResult(config *pgctld.PostgresCtlConfig) (*Reload
 }
 
 func runReload(cmd *cobra.Command, args []string) error {
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		return err
+	}
 
 	result, err := ReloadPostgreSQLConfigWithResult(config)
 	if err != nil {

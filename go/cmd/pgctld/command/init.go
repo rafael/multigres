@@ -60,9 +60,10 @@ Examples:
 }
 
 // InitDataDirWithResult initializes PostgreSQL data directory and returns detailed result information
-func InitDataDirWithResult(dataDir string) (*InitResult, error) {
+func InitDataDirWithResult(poolerDir string) (*InitResult, error) {
 	logger := slog.Default()
 	result := &InitResult{}
+	dataDir := pgctld.PostgresDataDir(poolerDir)
 
 	// Check if data directory is already initialized
 	if isDataDirInitialized(dataDir) {
@@ -77,7 +78,7 @@ func InitDataDirWithResult(dataDir string) (*InitResult, error) {
 		return nil, fmt.Errorf("failed to initialize data directory: %w", err)
 	}
 	// create server config using the pooler directory
-	_, err := pgctld.GeneratePostgresServerConfig("test", pgPort)
+	_, err := pgctld.GeneratePostgresServerConfig(poolerDir, pgPort)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create postgres config: %w", err)
 	}
@@ -89,16 +90,17 @@ func InitDataDirWithResult(dataDir string) (*InitResult, error) {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	result, err := InitDataDirWithResult(pgctld.PostgresDataDir())
+	poolerDir := pgctld.GetPoolerDir()
+	result, err := InitDataDirWithResult(poolerDir)
 	if err != nil {
 		return err
 	}
 
 	// Display appropriate message for CLI users
 	if result.AlreadyInitialized {
-		fmt.Printf("Data directory is already initialized: %s\n", pgctld.PostgresDataDir())
+		fmt.Printf("Data directory is already initialized: %s\n", pgctld.PostgresDataDir(poolerDir))
 	} else {
-		fmt.Printf("Data directory initialized successfully: %s\n", pgctld.PostgresDataDir())
+		fmt.Printf("Data directory initialized successfully: %s\n", pgctld.PostgresDataDir(poolerDir))
 	}
 
 	return nil

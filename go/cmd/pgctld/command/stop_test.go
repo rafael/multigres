@@ -122,7 +122,11 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 				testutil.CreatePIDFile(t, dataDir, 12345)
 			}
 
-			config := pgctld.NewPostgresCtlConfig("localhost", pgPort, "postgres", "postgres", "", 30)
+			poolerDir := baseDir
+			pgDataDir := pgctld.PostgresDataDir(poolerDir)
+			pgConfigFile := pgctld.PostgresConfigFile(poolerDir)
+			config, err := pgctld.NewPostgresCtlConfig("localhost", 5432, "postgres", "postgres", "", 30, pgDataDir, pgConfigFile, poolerDir)
+			require.NoError(t, err)
 
 			result, err := StopPostgreSQLWithResult(config, tt.mode)
 
@@ -144,11 +148,8 @@ func TestStopPostgreSQLWithResult(t *testing.T) {
 }
 
 func TestStopPostgreSQLWithResult_EmptyPoolerDir(t *testing.T) {
-	// Don't set pooler directory - this should cause an error
-	// when trying to generate PostgreSQL server config
-
 	// Create a mock PostgreSQL server config without setting pooler dir
-	_, err := pgctld.GeneratePostgresServerConfig("test", pgPort)
+	_, err := pgctld.GeneratePostgresServerConfig("", 5432)
 
 	// Should get an error about pooler-dir not being set
 	require.Error(t, err)
@@ -285,7 +286,7 @@ func TestStopPostgreSQLWithConfig(t *testing.T) {
 			}
 
 			// Create a mock PostgreSQL server config
-			pgConfig, err := pgctld.GeneratePostgresServerConfig("test", pgPort)
+			pgConfig, err := pgctld.GeneratePostgresServerConfig(baseDir, pgPort)
 			require.NoError(t, err)
 
 			// Always create data directory
@@ -296,7 +297,12 @@ func TestStopPostgreSQLWithConfig(t *testing.T) {
 				testutil.CreatePIDFile(t, pgConfig.DataDir, 12345)
 			}
 
-			config := pgctld.NewPostgresCtlConfig("localhost", pgPort, "postgres", "postgres", "", 30)
+			poolerDir := baseDir
+			pgDataDir := pgctld.PostgresDataDir(poolerDir)
+			pgConfigFile := pgctld.PostgresConfigFile(poolerDir)
+
+			config, err := pgctld.NewPostgresCtlConfig("localhost", 5432, "postgres", "postgres", "", 30, pgDataDir, pgConfigFile, poolerDir)
+			require.NoError(t, err)
 
 			err = StopPostgreSQLWithConfig(config, tt.mode)
 
@@ -313,31 +319,43 @@ func TestTakeCheckpoint(t *testing.T) {
 	tests := []struct {
 		name          string
 		setupBinaries bool
-		config        func() *pgctld.PostgresCtlConfig
+		config        func(baseDir string) *pgctld.PostgresCtlConfig
 		expectError   bool
 		errorContains string
 	}{
 		{
 			name:          "successful checkpoint",
 			setupBinaries: true,
-			config: func() *pgctld.PostgresCtlConfig {
-				return pgctld.NewPostgresCtlConfig("localhost", pgPort, "postgres", "postgres", "", 30)
+			config: func(baseDir string) *pgctld.PostgresCtlConfig {
+				pgDataDir := pgctld.PostgresDataDir(baseDir)
+				pgConfigFile := pgctld.PostgresConfigFile(baseDir)
+				config, err := pgctld.NewPostgresCtlConfig("localhost", 5432, "postgres", "postgres", "", 30, pgDataDir, pgConfigFile, baseDir)
+				require.NoError(t, err)
+				return config
 			},
 			expectError: false,
 		},
 		{
 			name:          "checkpoint with password",
 			setupBinaries: true,
-			config: func() *pgctld.PostgresCtlConfig {
-				return pgctld.NewPostgresCtlConfig("localhost", pgPort, "postgres", "postgres", "secret", 30)
+			config: func(baseDir string) *pgctld.PostgresCtlConfig {
+				pgDataDir := pgctld.PostgresDataDir(baseDir)
+				pgConfigFile := pgctld.PostgresConfigFile(baseDir)
+				config, err := pgctld.NewPostgresCtlConfig("localhost", 5432, "postgres", "postgres", "secret", 30, pgDataDir, pgConfigFile, baseDir)
+				require.NoError(t, err)
+				return config
 			},
 			expectError: false,
 		},
 		{
 			name:          "checkpoint failure - psql command fails",
 			setupBinaries: true, // Create failing psql binary
-			config: func() *pgctld.PostgresCtlConfig {
-				return pgctld.NewPostgresCtlConfig("localhost", pgPort, "postgres", "postgres", "", 30)
+			config: func(baseDir string) *pgctld.PostgresCtlConfig {
+				pgDataDir := pgctld.PostgresDataDir(baseDir)
+				pgConfigFile := pgctld.PostgresConfigFile(baseDir)
+				config, err := pgctld.NewPostgresCtlConfig("localhost", 5432, "postgres", "postgres", "", 30, pgDataDir, pgConfigFile, baseDir)
+				require.NoError(t, err)
+				return config
 			},
 			expectError:   true,
 			errorContains: "checkpoint command failed",
@@ -348,10 +366,6 @@ func TestTakeCheckpoint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			baseDir, cleanup := testutil.TempDir(t, "pgctld_checkpoint_test")
 			defer cleanup()
-
-			// Set up pooler directory early so config creation works
-			cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
-			defer cleanupPooler()
 
 			if tt.setupBinaries {
 				binDir := filepath.Join(baseDir, "bin")
@@ -369,7 +383,7 @@ func TestTakeCheckpoint(t *testing.T) {
 				defer os.Setenv("PATH", originalPath)
 			}
 
-			err := takeCheckpoint(tt.config())
+			err := takeCheckpoint(tt.config(baseDir))
 
 			if tt.expectError {
 				assert.Error(t, err)

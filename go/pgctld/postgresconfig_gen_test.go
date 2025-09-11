@@ -82,7 +82,7 @@ func TestPostgresBaseDir(t *testing.T) {
 	poolerDir = tempDir
 
 	expected := tempDir + "/pg_data"
-	result := PostgresDataDir()
+	result := PostgresDataDir(tempDir)
 
 	assert.Equal(t, expected, result, "PostgresDataDir should return expected path")
 }
@@ -95,7 +95,7 @@ func TestPostgresConfigFile(t *testing.T) {
 	poolerDir = tempDir
 
 	expected := tempDir + "/pg_data/postgresql.conf"
-	result := PostgresConfigFile()
+	result := PostgresConfigFile(tempDir)
 
 	assert.Equal(t, expected, result, "PostgresConfigFile should return expected path")
 }
@@ -107,7 +107,7 @@ func TestMakePostgresConf(t *testing.T) {
 	defer func() { poolerDir = originalPoolerDir }()
 	poolerDir = tempDir
 
-	config, err := GeneratePostgresServerConfig("test-pooler", 5432)
+	config, err := GeneratePostgresServerConfig(tempDir, 5432)
 	require.NoError(t, err, "GeneratePostgresServerConfig should not return error")
 
 	tests := []struct {
@@ -192,7 +192,7 @@ func TestMakePostgresConfInvalidTemplate(t *testing.T) {
 	defer func() { poolerDir = originalPoolerDir }()
 	poolerDir = tempDir
 
-	config, err := GeneratePostgresServerConfig("test-pooler", 5432)
+	config, err := GeneratePostgresServerConfig(tempDir, 5432)
 	require.NoError(t, err, "GeneratePostgresServerConfig should not return error")
 
 	tests := []struct {

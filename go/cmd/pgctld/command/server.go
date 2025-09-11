@@ -1,18 +1,16 @@
-/*
-Copyright 2025 The Multigres Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// Copyright 2025 The Multigres Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package command
 
@@ -60,8 +58,10 @@ func runServer(cmd *cobra.Command, args []string) error {
 	logger := servenv.GetLogger()
 
 	// Create and register our service
-	pgctldService := &PgCtldService{
-		logger: logger,
+	poolerDir := pgctld.GetPoolerDir()
+	pgctldService, err := NewPgCtldService(logger, pgctld.PostgresDataDir(poolerDir), pgctld.PostgresConfigFile(poolerDir), pgHost, pgPort, pgUser, pgDatabase, timeout, poolerDir)
+	if err != nil {
+		return err
 	}
 
 	servenv.OnRun(func() {
@@ -88,14 +88,65 @@ func runServer(cmd *cobra.Command, args []string) error {
 // PgCtldService implements the pgctld gRPC service
 type PgCtldService struct {
 	pb.UnimplementedPgCtldServer
-	logger *slog.Logger
+	logger             *slog.Logger
+	pgHost             string
+	pgPort             int
+	pgUser             string
+	pgDatabase         string
+	pgPassword         string
+	timeout            int
+	postgresDataDir    string
+	postgresConfigFile string
+	poolerDir          string
+}
+
+// NewPgCtldService creates a new PgCtldService with validation
+func NewPgCtldService(logger *slog.Logger, postgresDataDir string, postgresConfigFile string, pgHost string, pgPort int, pgUser string, pgDatabase string, timeout int, poolerDir string) (*PgCtldService, error) {
+	// Validate pooler-dir is set before creating service
+	if postgresDataDir == "" {
+		return nil, fmt.Errorf("pooler-dir needs to be set")
+	}
+	if postgresConfigFile == "" {
+		return nil, fmt.Errorf("postgres-config-file needs to be set")
+	}
+	if poolerDir == "" {
+		return nil, fmt.Errorf("pooler-dir needs to be set")
+	}
+	if pgHost == "" {
+		return nil, fmt.Errorf("pg-host needs to be set")
+	}
+	if pgPort == 0 {
+		return nil, fmt.Errorf("pg-port needs to be set")
+	}
+	if pgUser == "" {
+		return nil, fmt.Errorf("pg-user needs to be set")
+	}
+	if pgDatabase == "" {
+		return nil, fmt.Errorf("pg-database needs to be set")
+	}
+	if timeout == 0 {
+		return nil, fmt.Errorf("timeout needs to be set")
+	}
+
+	return &PgCtldService{
+		logger:             logger,
+		pgHost:             pgHost,
+		pgPort:             pgPort,
+		pgUser:             pgUser,
+		pgDatabase:         pgDatabase,
+		pgPassword:         pgPassword,
+		timeout:            timeout,
+		postgresDataDir:    postgresDataDir,
+		postgresConfigFile: postgresConfigFile,
+		poolerDir:          poolerDir,
+	}, nil
 }
 
 func (s *PgCtldService) Start(ctx context.Context, req *pb.StartRequest) (*pb.StartResponse, error) {
 	s.logger.Info("gRPC Start request", "port", req.Port)
 
 	// Create config from request parameters
-	config, err := NewPostgresConfigFromStartRequest(req)
+	config, err := s.NewPostgresConfigFromStartRequest(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
@@ -116,7 +167,7 @@ func (s *PgCtldService) Stop(ctx context.Context, req *pb.StopRequest) (*pb.Stop
 	s.logger.Info("gRPC Stop request", "mode", req.Mode)
 
 	// Create config from request parameters
-	config, err := NewPostgresConfigFromStopRequest(req)
+	config, err := s.NewPostgresConfigFromStopRequest(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
@@ -146,7 +197,10 @@ func (s *PgCtldService) Restart(ctx context.Context, req *pb.RestartRequest) (*p
 		timeout = int(req.Timeout)
 	}
 
-	config := pgctld.NewPostgresCtlConfig(pgHost, port, pgUser, pgDatabase, pgPassword, timeout)
+	config, err := pgctld.NewPostgresCtlConfig(s.pgHost, port, s.pgUser, s.pgDatabase, s.pgPassword, timeout, s.postgresDataDir, s.postgresConfigFile, s.poolerDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
 
 	// Use the shared restart function with detailed result
 	result, err := RestartPostgreSQLWithResult(config, req.Mode)
@@ -164,7 +218,13 @@ func (s *PgCtldService) ReloadConfig(ctx context.Context, req *pb.ReloadConfigRe
 	s.logger.Info("gRPC ReloadConfig request")
 
 	// Create config from request parameters
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := pgctld.NewPostgresCtlConfig(s.pgHost, s.pgPort, s.pgUser, s.pgDatabase, s.pgPassword, s.timeout, s.postgresDataDir, s.postgresConfigFile, s.poolerDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
 
 	// Use the shared reload function with detailed result
 	result, err := ReloadPostgreSQLConfigWithResult(config)
@@ -181,7 +241,10 @@ func (s *PgCtldService) Status(ctx context.Context, req *pb.StatusRequest) (*pb.
 	s.logger.Debug("gRPC Status request")
 
 	// Create config from request parameters
-	config, err := NewPostgresConfigFromStatusRequest(req)
+	config, err := pgctld.NewPostgresCtlConfig(s.pgHost, s.pgPort, s.pgUser, s.pgDatabase, s.pgPassword, s.timeout, s.postgresDataDir, s.postgresConfigFile, s.poolerDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
@@ -228,13 +291,19 @@ func (s *PgCtldService) Version(ctx context.Context, req *pb.VersionRequest) (*p
 	}
 
 	// Create config with overrides from request
-	config := &pgctld.PostgresCtlConfig{
-		Host:     pgHost,
-		Port:     port,
-		User:     pgUser,
-		Database: pgDatabase,
-		Password: pgPassword,
-		Timeout:  timeout,
+	config, err := pgctld.NewPostgresCtlConfig(
+		s.pgHost,
+		port,
+		s.pgUser,
+		s.pgDatabase,
+		s.pgPassword,
+		s.timeout,
+		s.postgresDataDir,
+		s.postgresConfigFile,
+		s.poolerDir,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 
 	// Override with request parameters if provided
@@ -264,7 +333,7 @@ func (s *PgCtldService) InitDataDir(ctx context.Context, req *pb.InitDataDirRequ
 	s.logger.Info("gRPC InitDataDir request")
 
 	// Use the shared init function with detailed result
-	result, err := InitDataDirWithResult(pgctld.PostgresDataDir())
+	result, err := InitDataDirWithResult(s.poolerDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize data directory: %w", err)
 	}
@@ -272,4 +341,35 @@ func (s *PgCtldService) InitDataDir(ctx context.Context, req *pb.InitDataDirRequ
 	return &pb.InitDataDirResponse{
 		Message: result.Message,
 	}, nil
+}
+
+// NewPostgresConfigFromStartRequest creates a PostgresCtlConfig from a gRPC StartRequest
+func (s *PgCtldService) NewPostgresConfigFromStartRequest(req *pb.StartRequest) (*pgctld.PostgresCtlConfig, error) {
+	// Determine the port to use
+	port := pgPort
+	if req.Port > 0 {
+		port = int(req.Port)
+	}
+
+	config, err := pgctld.NewPostgresCtlConfig(s.pgHost, port, s.pgUser, s.pgDatabase, s.pgPassword, timeout, s.postgresDataDir, s.postgresConfigFile, s.poolerDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+
+	return config, nil
+}
+
+// NewPostgresConfigFromStopRequest creates a PostgresCtlConfig from a gRPC StopRequest
+func (s *PgCtldService) NewPostgresConfigFromStopRequest(req *pb.StopRequest) (*pgctld.PostgresCtlConfig, error) {
+	timeout := timeout
+	if req.Timeout > 0 {
+		timeout = int(req.Timeout)
+	}
+
+	config, err := pgctld.NewPostgresCtlConfig(s.pgHost, s.pgPort, s.pgUser, s.pgDatabase, s.pgPassword, timeout, s.postgresDataDir, s.postgresConfigFile, s.poolerDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+
+	return config, nil
 }

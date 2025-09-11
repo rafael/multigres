@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/multigres/multigres/go/cmd/pgctld/testutil"
+	"github.com/multigres/multigres/go/pgctld"
 )
 
 func TestRunStatus(t *testing.T) {
@@ -96,6 +97,10 @@ func TestRunStatus(t *testing.T) {
 }
 
 func TestRunStatusNoPoolerDir(t *testing.T) {
+	// Ensure pooler directory is empty by resetting it
+	cleanupPooler := pgctld.SetPoolerDirForTest("")
+	defer cleanupPooler()
+
 	// Setup cleanup for cobra command execution
 	cleanupViper := SetupTestPgCtldCleanup(t)
 	defer cleanupViper()
@@ -148,7 +153,8 @@ func TestIsServerReady(t *testing.T) {
 			cleanupViper := SetupTestPgCtldCleanup(t)
 			defer cleanupViper()
 
-			result := isServerReady()
+			result, err := isServerReady()
+			require.NoError(t, err)
 			assert.Equal(t, tt.isReady, result)
 		})
 	}
@@ -192,11 +198,16 @@ func TestGetServerVersion(t *testing.T) {
 			cleanupViper := SetupTestPgCtldCleanup(t)
 			defer cleanupViper()
 
-			result := getServerVersion()
+			result, err := getServerVersion()
 			if tt.expectedOutput != "" {
+				require.NoError(t, err)
 				assert.Contains(t, result, tt.expectedOutput)
 			} else {
-				assert.Empty(t, result)
+				if err != nil {
+					assert.Empty(t, result)
+				} else {
+					assert.Empty(t, result)
+				}
 			}
 		})
 	}

@@ -67,14 +67,10 @@ func RestartPostgreSQLWithResult(config *pgctld.PostgresCtlConfig, mode string) 
 	logger := slog.Default()
 	result := &RestartResult{}
 
-	if pgctld.PostgresDataDir() == "" {
-		return nil, fmt.Errorf("data-dir is required")
-	}
-
-	logger.Info("Restarting PostgreSQL server", "data_dir", pgctld.PostgresDataDir(), "mode", mode)
+	logger.Info("Restarting PostgreSQL server", "data_dir", config.PostgresDataDir, "mode", mode)
 
 	// Stop the server if it's running
-	if isPostgreSQLRunning(pgctld.PostgresDataDir()) {
+	if isPostgreSQLRunning(config.PostgresDataDir) {
 		logger.Info("Stopping PostgreSQL server")
 		stopResult, err := StopPostgreSQLWithResult(config, mode)
 		if err != nil {
@@ -101,7 +97,10 @@ func RestartPostgreSQLWithResult(config *pgctld.PostgresCtlConfig, mode string) 
 }
 
 func runRestart(cmd *cobra.Command, args []string) error {
-	config := NewPostgresCtlConfigFromDefaults()
+	config, err := NewPostgresCtlConfigFromDefaults()
+	if err != nil {
+		return err
+	}
 	mode, _ := cmd.Flags().GetString("mode")
 
 	result, err := RestartPostgreSQLWithResult(config, mode)

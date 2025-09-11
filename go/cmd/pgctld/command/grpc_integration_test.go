@@ -337,10 +337,6 @@ func TestGRPCWithDifferentConfigurations(t *testing.T) {
 func createTestGRPCServer(t *testing.T, dataDir, binDir string) (net.Listener, func()) {
 	t.Helper()
 
-	// Setup cleanup for global variables
-	cleanupViper := SetupTestPgCtldCleanup(t)
-	cleanupPooler := pgctld.SetPoolerDirForTest(dataDir)
-
 	// Find a free port
 	lis, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)
@@ -349,20 +345,21 @@ func createTestGRPCServer(t *testing.T, dataDir, binDir string) (net.Listener, f
 	grpcServer := grpc.NewServer()
 
 	// Create the pgctld service with mock environment
-	service := &PgCtldService{
-		logger: slog.Default(),
-	}
+	service, err := NewPgCtldService(
+		slog.Default(),
+		pgctld.PostgresDataDir(dataDir),
+		pgctld.PostgresConfigFile(dataDir),
+		"localhost", 5432,
+		"postgres",
+		"postgres",
+		30,
+		dataDir,
+	)
 
+	require.NoError(t, err)
 	// Set environment variables for the service
 	t.Setenv("PGDATA", dataDir)
 	t.Setenv("PATH", binDir+":"+os.Getenv("PATH"))
-
-	// Configure flag variables for the test (instead of viper)
-	pgDataDir = dataDir
-	pgPort = 5432
-	pgHost = "localhost"
-	pgUser = "postgres"
-	pgDatabase = "postgres"
 
 	// Register the service
 	pb.RegisterPgCtldServer(grpcServer, service)
@@ -380,8 +377,6 @@ func createTestGRPCServer(t *testing.T, dataDir, binDir string) (net.Listener, f
 	// Return cleanup function that stops server and cleans up global variables
 	cleanup := func() {
 		grpcServer.Stop()
-		cleanupViper()
-		cleanupPooler()
 	}
 
 	return lis, cleanup
