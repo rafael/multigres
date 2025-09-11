@@ -68,9 +68,9 @@ func TestRunStatus(t *testing.T) {
 
 	// Test 1: Not initialized (no data directory exists yet)
 	t.Run("not_initialized", func(t *testing.T) {
-		output, err := runStatusCommand()
-		require.NoError(t, err)
-		assert.Contains(t, output, "Status: Not initialized")
+		_, err := runStatusCommand()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "data directory not initialized")
 	})
 
 	// Test 2: Stopped (initialized but no PID file)
@@ -190,6 +190,13 @@ func TestGetServerVersion(t *testing.T) {
 			binDir := filepath.Join(baseDir, "bin")
 			require.NoError(t, os.MkdirAll(binDir, 0o755))
 			tt.setupBinary(binDir)
+
+			// Create initialized data directory with postgresql.conf
+			testutil.CreateDataDir(t, baseDir, true)
+
+			// Set pooler directory for the test
+			cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
+			defer cleanupPooler()
 
 			originalPath := os.Getenv("PATH")
 			os.Setenv("PATH", binDir+":"+originalPath)
