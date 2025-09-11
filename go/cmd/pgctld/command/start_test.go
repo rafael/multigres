@@ -35,12 +35,12 @@ func TestRunStart(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name: "successful start with uninitialized data dir",
+			name: "start with uninitialized data dir fails",
 			setupDataDir: func(pgDataDir string) string {
 				return testutil.CreateDataDir(t, pgDataDir, false) // uninitialized
 			},
 			setupBinaries: true,
-			expectError:   false,
+			expectError:   true,
 		},
 		{
 			name: "successful start with initialized data dir",
@@ -74,7 +74,7 @@ func TestRunStart(t *testing.T) {
 			cleanupViper := SetupTestPgCtldCleanup(t)
 			defer cleanupViper()
 
-			dataDir := tt.setupDataDir(baseDir)
+			tt.setupDataDir(baseDir)
 
 			// Setup mock binaries if needed
 			if tt.setupBinaries {
@@ -103,9 +103,6 @@ func TestRunStart(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
-
-				// Verify data directory was initialized
-				assert.True(t, pgctld.IsDataDirInitialized(dataDir), "Data directory should be initialized")
 			}
 		})
 	}
@@ -145,12 +142,8 @@ func TestIsDataDirInitialized(t *testing.T) {
 			baseDir, cleanup := testutil.TempDir(t, "pgctld_init_test")
 			defer cleanup()
 
-			// Set up pooler directory
-			cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
-			defer cleanupPooler()
-
-			dataDir := tt.setupDir(baseDir)
-			result := pgctld.IsDataDirInitialized(dataDir)
+			tt.setupDir(baseDir)
+			result := pgctld.IsDataDirInitialized(baseDir)
 			assert.Equal(t, tt.initialized, result)
 		})
 	}
@@ -253,6 +246,9 @@ func TestWaitForPostgreSQL(t *testing.T) {
 		cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
 		defer cleanupPooler()
 
+		// Create initialized data directory with postgresql.conf
+		testutil.CreateDataDir(t, baseDir, true)
+
 		// Setup mock pg_isready that succeeds
 		binDir := filepath.Join(baseDir, "bin")
 		require.NoError(t, os.MkdirAll(binDir, 0o755))
@@ -277,6 +273,9 @@ func TestWaitForPostgreSQL(t *testing.T) {
 		// Set up pooler directory
 		cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
 		defer cleanupPooler()
+
+		// Create initialized data directory with postgresql.conf
+		testutil.CreateDataDir(t, baseDir, true)
 
 		// Create mock pg_isready that always fails
 		binDir := filepath.Join(baseDir, "bin")

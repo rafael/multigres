@@ -43,7 +43,7 @@ func TestPgCtldServiceStart(t *testing.T) {
 		checkResponse func(*testing.T, *pb.StartResponse)
 	}{
 		{
-			name: "successful start with uninitialized data dir",
+			name: "start with uninitialized data dir should fail",
 			request: &pb.StartRequest{
 				Port:      5432,
 				ExtraArgs: []string{},
@@ -52,11 +52,8 @@ func TestPgCtldServiceStart(t *testing.T) {
 				return testutil.CreateDataDir(t, baseDir, false)
 			},
 			setupBinaries: true,
-			expectError:   false,
-			checkResponse: func(t *testing.T, resp *pb.StartResponse) {
-				assert.NotZero(t, resp.Pid)
-				assert.Contains(t, resp.Message, "successfully")
-			},
+			expectError:   true,
+			errorContains: "data directory not initialized",
 		},
 		{
 			name: "start already running server",

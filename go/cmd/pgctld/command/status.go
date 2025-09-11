@@ -183,15 +183,6 @@ func formatUptime(seconds int64) string {
 	}
 }
 
-func isServerReady() (bool, error) {
-	config, err := NewPostgresCtlConfigFromDefaults()
-	if err != nil {
-		return false, err
-	}
-
-	return isServerReadyWithConfig(config), nil
-}
-
 func isServerReadyWithConfig(config *pgctld.PostgresCtlConfig) bool {
 	cmd := exec.Command("pg_isready",
 		"-h", config.Host,
@@ -201,15 +192,6 @@ func isServerReadyWithConfig(config *pgctld.PostgresCtlConfig) bool {
 	)
 
 	return cmd.Run() == nil
-}
-
-func getServerVersion() (string, error) {
-	config, err := NewPostgresCtlConfigFromDefaults()
-	if err != nil {
-		return "", err
-	}
-
-	return getServerVersionWithConfig(config), nil
 }
 
 func getServerVersionWithConfig(config *pgctld.PostgresCtlConfig) string {

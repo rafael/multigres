@@ -352,11 +352,25 @@ timeout: 30
 	t.Run("start_with_nonexistent_data_dir", func(t *testing.T) {
 		nonexistentDir := filepath.Join(tempDir, "nonexistent")
 
-		// Try to start with non-existent directory - should initialize and start
+		// Try to start with non-existent directory - should fail requiring init first
 		startCmd := exec.Command(pgctldBinary, "start", "--pooler-dir", nonexistentDir, "--config-file", pgctldConfigFile)
 		startCmd.Env = append(os.Environ(),
 			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
 		err := startCmd.Run()
+		require.Error(t, err, "Start should fail when data directory is not initialized")
+
+		// Initialize first, then start should work
+		initCmd := exec.Command(pgctldBinary, "init", "--pooler-dir", nonexistentDir, "--config-file", pgctldConfigFile)
+		initCmd.Env = append(os.Environ(),
+			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
+		err = initCmd.Run()
+		require.NoError(t, err)
+
+		// Now start should work
+		startCmd = exec.Command(pgctldBinary, "start", "--pooler-dir", nonexistentDir, "--config-file", pgctldConfigFile)
+		startCmd.Env = append(os.Environ(),
+			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
+		err = startCmd.Run()
 		require.NoError(t, err)
 
 		// Clean stop
@@ -367,11 +381,18 @@ timeout: 30
 	})
 
 	t.Run("double_start_attempt", func(t *testing.T) {
+		// Initialize data directory first
+		initCmd := exec.Command(pgctldBinary, "init", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
+		initCmd.Env = append(os.Environ(),
+			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
+		err := initCmd.Run()
+		require.NoError(t, err)
+
 		// Start PostgreSQL
 		startCmd := exec.Command(pgctldBinary, "start", "--pooler-dir", dataDir, "--config-file", pgctldConfigFile)
 		startCmd.Env = append(os.Environ(),
 			"PATH="+filepath.Join(tempDir, "bin")+":"+os.Getenv("PATH"))
-		err := startCmd.Run()
+		err = startCmd.Run()
 		require.NoError(t, err)
 
 		// Try to start again - should handle gracefully

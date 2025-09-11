@@ -150,11 +150,16 @@ func TestIsServerReady(t *testing.T) {
 			os.Setenv("PATH", binDir+":"+originalPath)
 			defer os.Setenv("PATH", originalPath)
 
-			cleanupViper := SetupTestPgCtldCleanup(t)
-			defer cleanupViper()
+			// Create initialized data directory with postgresql.conf
+			testutil.CreateDataDir(t, baseDir, true)
 
-			result, err := isServerReady()
+			// Create config directly for the test
+			config, err := pgctld.NewPostgresCtlConfig(
+				"localhost", 5432, "postgres", "postgres", "",
+				30, pgctld.PostgresDataDir(baseDir), pgctld.PostgresConfigFile(baseDir), baseDir)
 			require.NoError(t, err)
+
+			result := isServerReadyWithConfig(config)
 			assert.Equal(t, tt.isReady, result)
 		})
 	}
@@ -194,27 +199,21 @@ func TestGetServerVersion(t *testing.T) {
 			// Create initialized data directory with postgresql.conf
 			testutil.CreateDataDir(t, baseDir, true)
 
-			// Set pooler directory for the test
-			cleanupPooler := pgctld.SetPoolerDirForTest(baseDir)
-			defer cleanupPooler()
-
 			originalPath := os.Getenv("PATH")
 			os.Setenv("PATH", binDir+":"+originalPath)
 			defer os.Setenv("PATH", originalPath)
 
-			cleanupViper := SetupTestPgCtldCleanup(t)
-			defer cleanupViper()
+			// Create config directly for the test
+			config, err := pgctld.NewPostgresCtlConfig(
+				"localhost", 5432, "postgres", "postgres", "",
+				30, pgctld.PostgresDataDir(baseDir), pgctld.PostgresConfigFile(baseDir), baseDir)
+			require.NoError(t, err)
 
-			result, err := getServerVersion()
+			result := getServerVersionWithConfig(config)
 			if tt.expectedOutput != "" {
-				require.NoError(t, err)
 				assert.Contains(t, result, tt.expectedOutput)
 			} else {
-				if err != nil {
-					assert.Empty(t, result)
-				} else {
-					assert.Empty(t, result)
-				}
+				assert.Empty(t, result)
 			}
 		})
 	}
