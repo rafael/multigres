@@ -31,7 +31,6 @@ import (
 
 	"github.com/multigres/multigres/go/cmd/pgctld/testutil"
 	pb "github.com/multigres/multigres/go/pb/pgctldservice"
-	"github.com/multigres/multigres/go/pgctld"
 )
 
 // TestGRPCServerIntegration tests the gRPC server with mock PostgreSQL
@@ -422,8 +421,6 @@ func createTestGRPCServer(t *testing.T, dataDir, binDir string) (net.Listener, f
 	// Create the pgctld service with mock environment
 	service, err := NewPgCtldService(
 		slog.Default(),
-		pgctld.PostgresDataDir(dataDir),
-		pgctld.PostgresConfigFile(dataDir),
 		"localhost", 5432,
 		"postgres",
 		"postgres",
