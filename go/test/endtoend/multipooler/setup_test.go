@@ -1298,10 +1298,11 @@ func restoreGUCs(t *testing.T, client *endtoend.MultiPoolerTestClient, savedGucs
 
 // validateCleanState checks that primary and standby are in the expected clean state.
 // Expected state:
-//   - Primary: primary_conninfo=", synchronous_standby_names="
-//   - Standby: pg_is_in_recovery=true, primary_conninfo=", pg_is_wal_replay_paused=false
+//   - Primary: primary_conninfo="", synchronous_standby_names=""
+//   - Standby: pg_is_in_recovery=true, primary_conninfo="", pg_is_wal_replay_paused=false
 //
-// Returns an error if state is not clean.
+// Returns nil if state is clean, or an error describing what failed.
+// Uses retries for PostgreSQL queries to handle timing issues.
 func validateCleanState(setup *MultipoolerTestSetup) error {
 	if setup == nil {
 		return nil
@@ -1309,6 +1310,23 @@ func validateCleanState(setup *MultipoolerTestSetup) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	// Helper to retry a check with timeout
+	eventuallyTrue := func(check func() bool) bool {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		timeout := time.After(5 * time.Second)
+		for {
+			if check() {
+				return true
+			}
+			select {
+			case <-timeout:
+				return false
+			case <-ticker.C:
+			}
+		}
+	}
 
 	// Validate primary state
 	if setup.PrimaryMultipooler != nil {
@@ -1319,30 +1337,35 @@ func validateCleanState(setup *MultipoolerTestSetup) error {
 		defer primaryClient.Close()
 
 		// Verify primary is NOT in recovery mode (is actually a primary)
-		inRecovery, err := queryStringValue(ctx, primaryClient.Pooler, "SELECT pg_is_in_recovery()")
-		if err != nil {
-			return fmt.Errorf("Primary failed to query pg_is_in_recovery: %w", err)
-		}
-		// PostgreSQL wire protocol returns boolean as 't' or 'f' in text format
-		if inRecovery != "f" {
-			return fmt.Errorf("Primary pg_is_in_recovery=%s (expected f)", inRecovery)
+		if !eventuallyTrue(func() bool {
+			inRecovery, err := queryStringValue(ctx, primaryClient.Pooler, "SELECT pg_is_in_recovery()")
+			return err == nil && inRecovery == "f"
+		}) {
+			return fmt.Errorf("Primary pg_is_in_recovery is not 'f'")
 		}
 
-		if err := validateGUCValue(primaryClient.Pooler, "primary_conninfo", "", "Primary"); err != nil {
-			return err
+		if !eventuallyTrue(func() bool {
+			return validateGUCValue(primaryClient.Pooler, "primary_conninfo", "", "Primary") == nil
+		}) {
+			actualValue, _ := queryStringValue(ctx, primaryClient.Pooler, "SHOW primary_conninfo")
+			return fmt.Errorf("Primary primary_conninfo is not '' (actual: %q)", actualValue)
 		}
-		if err := validateGUCValue(primaryClient.Pooler, "synchronous_standby_names", "", "Primary"); err != nil {
-			return err
+
+		if !eventuallyTrue(func() bool {
+			return validateGUCValue(primaryClient.Pooler, "synchronous_standby_names", "", "Primary") == nil
+		}) {
+			actualValue, _ := queryStringValue(ctx, primaryClient.Pooler, "SHOW synchronous_standby_names")
+			return fmt.Errorf("Primary synchronous_standby_names is not '' (actual: %q)", actualValue)
 		}
 
 		// Validate primary pooler type in topology
 		if err := validatePoolerType(ctx, primaryClient.Manager, clustermetadatapb.PoolerType_PRIMARY, "Primary"); err != nil {
-			return err
+			return fmt.Errorf("Primary pooler type: %w", err)
 		}
 
 		// Validate primary term is 1
 		if err := validateTerm(ctx, primaryClient.Consensus, 1, "Primary"); err != nil {
-			return err
+			return fmt.Errorf("Primary term: %w", err)
 		}
 	}
 
@@ -1355,38 +1378,37 @@ func validateCleanState(setup *MultipoolerTestSetup) error {
 		defer standbyClient.Close()
 
 		// Verify standby is in recovery mode
-		inRecovery, err := queryStringValue(ctx, standbyClient.Pooler, "SELECT pg_is_in_recovery()")
-		if err != nil {
-			return fmt.Errorf("Standby failed to query pg_is_in_recovery: %w", err)
-		}
-		// PostgreSQL wire protocol returns boolean as 't' or 'f' in text format
-		if inRecovery != "t" {
-			return fmt.Errorf("Standby pg_is_in_recovery=%s (expected t)", inRecovery)
+		if !eventuallyTrue(func() bool {
+			inRecovery, err := queryStringValue(ctx, standbyClient.Pooler, "SELECT pg_is_in_recovery()")
+			return err == nil && inRecovery == "t"
+		}) {
+			return fmt.Errorf("Standby pg_is_in_recovery is not 't'")
 		}
 
 		// Verify replication not configured
-		if err := validateGUCValue(standbyClient.Pooler, "primary_conninfo", "", "Standby"); err != nil {
-			return err
+		if !eventuallyTrue(func() bool {
+			return validateGUCValue(standbyClient.Pooler, "primary_conninfo", "", "Standby") == nil
+		}) {
+			actualValue, _ := queryStringValue(ctx, standbyClient.Pooler, "SHOW primary_conninfo")
+			return fmt.Errorf("Standby primary_conninfo is not '' (actual: %q)", actualValue)
 		}
 
 		// Verify WAL replay not paused
-		isPaused, err := queryStringValue(ctx, standbyClient.Pooler, "SELECT pg_is_wal_replay_paused()")
-		if err != nil {
-			return fmt.Errorf("Standby failed to query pg_is_wal_replay_paused: %w", err)
-		}
-		// PostgreSQL wire protocol returns boolean as 't' or 'f' in text format
-		if isPaused != "f" {
-			return fmt.Errorf("Standby pg_is_wal_replay_paused=%s (expected f)", isPaused)
+		if !eventuallyTrue(func() bool {
+			isPaused, err := queryStringValue(ctx, standbyClient.Pooler, "SELECT pg_is_wal_replay_paused()")
+			return err == nil && isPaused == "f"
+		}) {
+			return fmt.Errorf("Standby pg_is_wal_replay_paused is not 'f'")
 		}
 
 		// Validate standby pooler type in topology
 		if err := validatePoolerType(ctx, standbyClient.Manager, clustermetadatapb.PoolerType_REPLICA, "Standby"); err != nil {
-			return err
+			return fmt.Errorf("Standby pooler type: %w", err)
 		}
 
 		// Validate standby term is 1
 		if err := validateTerm(ctx, standbyClient.Consensus, 1, "Standby"); err != nil {
-			return err
+			return fmt.Errorf("Standby term: %w", err)
 		}
 	}
 
@@ -1557,7 +1579,7 @@ func setupPoolerTest(t *testing.T, setup *MultipoolerTestSetup, opts ...cleanupO
 	// Validate that settings are in the expected clean state.
 	// This catches state leaks from tests that don't call setupPoolerTest().
 	if err := validateCleanState(setup); err != nil {
-		t.Fatalf("setupPoolerTest: %v. Previous test leaked state. Make sure all subtests call setupPoolerTest().", err)
+		t.Fatalf("setupPoolerTest: Previous test leaked state (%v). Make sure all subtests call setupPoolerTest().", err)
 	}
 
 	// Determine if we should configure replication (default: yes, unless WithoutReplication)
@@ -1829,9 +1851,8 @@ func setupPoolerTest(t *testing.T, setup *MultipoolerTestSetup, opts ...cleanupO
 		}
 
 		// Validate that cleanup fully applied and state is clean
-		// Use Eventually to give the system time to reach clean state
-		require.Eventually(t, func() bool {
-			return validateCleanState(setup) == nil
-		}, 2*time.Second, 50*time.Millisecond, "Test cleanup failed: state did not return to clean state after cleanup")
+		if err := validateCleanState(setup); err != nil {
+			t.Fatalf("Test cleanup failed: state did not return to clean state after cleanup (%v)", err)
+		}
 	})
 }
