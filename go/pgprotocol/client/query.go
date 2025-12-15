@@ -98,41 +98,46 @@ func (c *Conn) writeQueryMessage(queryStr string) error {
 // - On CommandComplete: remaining rows + CommandTag sent together (signals end of result set)
 // For small result sets, this means a single callback with Fields, Rows, and CommandTag.
 // For large result sets, multiple callbacks with rows, final one includes CommandTag.
+//
+// IMPORTANT: This function ALWAYS drains to ReadyForQuery before returning, even on errors.
+// This ensures the connection remains in a clean state for reuse by the connection pool.
 func (c *Conn) processQueryResponses(ctx context.Context, callback func(ctx context.Context, result *query.QueryResult) error) error {
 	// Track state for current result set.
 	var currentFields []*query.Field
 	var batchedRows []*query.Row
 	var batchedSize int
 
+	// callbackErr captures any error returned by the callback.
+	// We continue processing until ReadyForQuery to keep the connection clean.
+	var callbackErr error
+
 	// flushBatch sends accumulated rows via callback and resets the batch.
 	// Does not reset currentFields as they may be needed for subsequent batches.
-	flushBatch := func() error {
-		if len(batchedRows) == 0 || callback == nil {
-			return nil
+	// If callback returns error, we capture it but continue processing.
+	flushBatch := func() {
+		if len(batchedRows) == 0 || callback == nil || callbackErr != nil {
+			return
 		}
 		result := &query.QueryResult{
 			Fields: currentFields,
 			Rows:   batchedRows,
 		}
 		if err := callback(ctx, result); err != nil {
-			return err
+			callbackErr = err
 		}
 		batchedRows = nil
 		batchedSize = 0
-		return nil
 	}
 
 	for {
-		// Check context.
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		// Read message.
+		// Read message. We don't check context here because we MUST drain to
+		// ReadyForQuery to keep the connection in a clean state.
 		msgType, body, err := c.readMessage()
 		if err != nil {
+			// If we had a callback error, return that instead since it's more relevant.
+			if callbackErr != nil {
+				return callbackErr
+			}
 			return fmt.Errorf("failed to read message: %w", err)
 		}
 
@@ -142,14 +147,23 @@ func (c *Conn) processQueryResponses(ctx context.Context, callback func(ctx cont
 			// Fields will be included in the first batch callback.
 			result := &query.QueryResult{}
 			if err := c.parseRowDescription(body, result); err != nil {
-				return err
+				// Continue draining even on parse errors.
+				if callbackErr == nil {
+					callbackErr = err
+				}
+				continue
 			}
 			currentFields = result.Fields
 
 		case protocol.MsgDataRow:
+			// Skip data rows if we already have an error.
+			if callbackErr != nil {
+				continue
+			}
 			row, err := c.parseDataRow(body)
 			if err != nil {
-				return err
+				callbackErr = err
+				continue
 			}
 
 			// Add row to batch and track size.
@@ -158,20 +172,25 @@ func (c *Conn) processQueryResponses(ctx context.Context, callback func(ctx cont
 
 			// Flush batch if size threshold exceeded.
 			if batchedSize >= DefaultStreamingBatchSize {
-				if err := flushBatch(); err != nil {
-					return err
-				}
+				flushBatch()
 			}
 
 		case protocol.MsgCommandComplete:
 			tag, err := c.parseCommandComplete(body)
 			if err != nil {
-				return err
+				if callbackErr == nil {
+					callbackErr = err
+				}
+				// Reset state for next result set.
+				currentFields = nil
+				batchedRows = nil
+				batchedSize = 0
+				continue
 			}
 
 			// Send final batch with CommandTag (signals end of result set).
 			// This combines any remaining rows with the command completion.
-			if callback != nil {
+			if callback != nil && callbackErr == nil {
 				result := &query.QueryResult{
 					Fields:       currentFields,
 					Rows:         batchedRows,
@@ -179,7 +198,7 @@ func (c *Conn) processQueryResponses(ctx context.Context, callback func(ctx cont
 					RowsAffected: parseRowsAffected(tag),
 				}
 				if err := callback(ctx, result); err != nil {
-					return err
+					callbackErr = err
 				}
 			}
 
@@ -190,19 +209,24 @@ func (c *Conn) processQueryResponses(ctx context.Context, callback func(ctx cont
 
 		case protocol.MsgEmptyQueryResponse:
 			// Empty query, call callback with empty result.
-			if callback != nil {
+			if callback != nil && callbackErr == nil {
 				if err := callback(ctx, &query.QueryResult{}); err != nil {
-					return err
+					callbackErr = err
 				}
 			}
 
 		case protocol.MsgReadyForQuery:
-			// Query complete.
+			// Query complete - connection is now in clean state.
 			c.txnStatus = body[0]
-			return nil
+			return callbackErr
 
 		case protocol.MsgErrorResponse:
-			return c.handleErrorAndWaitForReady(body)
+			// Server sent an error. Wait for ReadyForQuery.
+			pgErr := c.parseError(body)
+			if callbackErr == nil {
+				callbackErr = pgErr
+			}
+			// Continue processing - ReadyForQuery will follow.
 
 		case protocol.MsgNoticeResponse:
 			// Ignore notices for now.
@@ -210,11 +234,16 @@ func (c *Conn) processQueryResponses(ctx context.Context, callback func(ctx cont
 		case protocol.MsgParameterStatus:
 			// Handle parameter status updates.
 			if err := c.handleParameterStatus(body); err != nil {
-				return err
+				if callbackErr == nil {
+					callbackErr = err
+				}
 			}
 
 		default:
-			return fmt.Errorf("unexpected message type in query response: %c (0x%02x)", msgType, msgType)
+			if callbackErr == nil {
+				callbackErr = fmt.Errorf("unexpected message type in query response: %c (0x%02x)", msgType, msgType)
+			}
+			// Continue draining to ReadyForQuery.
 		}
 	}
 }
