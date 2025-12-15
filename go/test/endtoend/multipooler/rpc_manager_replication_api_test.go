@@ -1480,6 +1480,7 @@ func TestConfigureSynchronousReplication(t *testing.T) {
 	})
 
 	t.Run("ConfigureSynchronousReplication_AllCommitLevels", func(t *testing.T) {
+		setupPoolerTest(t, setup, WithoutReplication())
 		// This test verifies that all SynchronousCommitLevel values work correctly
 		t.Log("Testing ConfigureSynchronousReplication with all commit levels...")
 
@@ -1505,7 +1506,6 @@ func TestConfigureSynchronousReplication(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.level.String(), func(t *testing.T) {
-				setupPoolerTest(t, setup, WithoutReplication())
 				// Configure with this commit level
 				req := &multipoolermanagerdatapb.ConfigureSynchronousReplicationRequest{
 					SynchronousCommit: tc.level,
@@ -1625,9 +1625,9 @@ func TestConfigureSynchronousReplication(t *testing.T) {
 			},
 		}
 
+		setupPoolerTest(t, setup, WithoutReplication())
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				setupPoolerTest(t, setup, WithoutReplication())
 				// Configure with this synchronous method
 				req := &multipoolermanagerdatapb.ConfigureSynchronousReplicationRequest{
 					SynchronousCommit: multipoolermanagerdatapb.SynchronousCommitLevel_SYNCHRONOUS_COMMIT_ON,
