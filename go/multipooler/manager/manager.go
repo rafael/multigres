@@ -1042,6 +1042,17 @@ func (pm *MultiPoolerManager) restartPostgresAsStandby(ctx context.Context, stat
 
 	pm.logger.InfoContext(ctx, "Restarting PostgreSQL as standby")
 
+	// CRITICAL: Clear primary_conninfo BEFORE restarting PostgreSQL.
+	// If we don't clear it, PostgreSQL will restart with the old primary_conninfo
+	// (which might point to the new primary on a different timeline) and immediately
+	// connect to it, updating its own pg_control to the new timeline. This makes
+	// timeline divergence undetectable by pg_rewind.
+	pm.logger.InfoContext(ctx, "Clearing primary_conninfo before restart to prevent timeline contamination")
+	if err := pm.resetPrimaryConnInfo(ctx); err != nil {
+		pm.logger.WarnContext(ctx, "Failed to clear primary_conninfo before restart", "error", err)
+		// Don't fail the demote - FixReplication will handle this later
+	}
+
 	// Call pgctld to restart as standby
 	// This will create standby.signal and restart the server
 	req := &pgctldpb.RestartRequest{
@@ -1326,7 +1337,19 @@ func (pm *MultiPoolerManager) promoteStandbyToPrimary(ctx context.Context, state
 
 	// Wait for promotion to complete by polling pg_is_in_recovery()
 	pm.logger.InfoContext(ctx, "Waiting for promotion to complete")
-	return pm.waitForPromotionComplete(ctx)
+	if err := pm.waitForPromotionComplete(ctx); err != nil {
+		return err
+	}
+
+	// Run checkpoint after promotion completes
+	pm.logger.InfoContext(ctx, "Running checkpoint after promotion")
+	if err := pm.exec(ctx, "CHECKPOINT"); err != nil {
+		pm.logger.ErrorContext(ctx, "Failed to run checkpoint after promotion", "error", err)
+		return mterrors.Wrap(err, "failed to checkpoint after promotion")
+	}
+	pm.logger.InfoContext(ctx, "Checkpoint after promotion completed successfully")
+
+	return nil
 }
 
 // waitForPromotionComplete polls pg_is_in_recovery() until promotion is complete

@@ -269,8 +269,10 @@ def print_replication_status():
 
         # Find the primary
         primary = None
-        replicas = []
+        primary_service_id = None
+        all_poolers = []
 
+        # First pass: collect all poolers and find the healthy primary
         for pooler in poolers:
             cell = pooler['id']['cell']
             service_id = pooler['id']['name']
@@ -282,6 +284,7 @@ def print_replication_status():
                 continue
 
             socket_dir = f"{pooler_dir}/pg_sockets"
+            all_poolers.append((cell, service_id, pg_port, socket_dir, pooler_type))
 
             if pooler_type == 'PRIMARY':
                 # Verify it's actually healthy
@@ -290,10 +293,13 @@ def print_replication_status():
                     status = status_data.get('status', {})
                     if status.get('postgres_running') and status.get('primary_status', {}).get('ready'):
                         primary = (cell, service_id, pg_port, socket_dir)
+                        primary_service_id = service_id
                 except Exception:
                     pass
-            elif pooler_type == 'REPLICA':
-                replicas.append((cell, service_id, pg_port, socket_dir))
+
+        # Second pass: all non-primary poolers are treated as replicas
+        replicas = [(cell, sid, port, sock) for cell, sid, port, sock, ptype in all_poolers
+                    if sid != primary_service_id]
 
         # Get primary timeline info
         if primary:
@@ -367,7 +373,9 @@ def stop_pooler(pooler_dir: str, pg_port: int):
     log_info(f"Stopping pooler: {pooler_dir} (port: {pg_port})")
     subprocess.run(
         [PGCTLD_BIN, "stop", "--pooler-dir", pooler_dir, "--pg-port", str(pg_port)],
-        check=True
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
     )
     log_success("Pooler stopped")
 
@@ -376,7 +384,9 @@ def start_pooler(pooler_dir: str, pg_port: int):
     log_info(f"Starting pooler: {pooler_dir} (port: {pg_port})")
     subprocess.run(
         [PGCTLD_BIN, "start", "--pooler-dir", pooler_dir, "--pg-port", str(pg_port)],
-        check=True
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
     )
     log_success("Pooler started")
 
