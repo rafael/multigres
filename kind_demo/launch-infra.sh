@@ -27,6 +27,36 @@ if [[ $(basename "$PWD") != "kind_demo" ]]; then
   exit 1
 fi
 
+# Helper function to wait for resources to exist before waiting for their condition
+wait_for_resource() {
+  local resource_type=$1
+  local selector=$2
+  local namespace=${3:-default}
+  local max_attempts=24
+  local attempt=1
+
+  echo "Waiting for $resource_type ($selector) to be created..."
+  while [ $attempt -le $max_attempts ]; do
+    if [ "$namespace" = "default" ]; then
+      if kubectl get "$resource_type" $selector 2>/dev/null | tail -n +2 | grep -q .; then
+        echo "Resources created, waiting for ready state..."
+        return 0
+      fi
+    else
+      if kubectl get "$resource_type" -n "$namespace" $selector 2>/dev/null | tail -n +2 | grep -q .; then
+        echo "Resources created, waiting for ready state..."
+        return 0
+      fi
+    fi
+    if [ $attempt -eq $max_attempts ]; then
+      echo "Timeout: $resource_type not created after $max_attempts attempts"
+      return 1
+    fi
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 # Initialize the cluster with etcd
 kind create cluster --config=kind.yaml --name=multidemo
 
@@ -41,6 +71,7 @@ done
 kind load docker-image multigres/multigres multigres/pgctld-postgres multigres/multiadmin-web --name=multidemo
 # This single etcd will be used for both the global topo and cell topo.
 kubectl apply -f k8s-etcd.yaml
+wait_for_resource pod "-l app=etcd"
 kubectl wait --for=condition=ready pod -l app=etcd --timeout=120s
 
 # Deploy observability stack (Prometheus, Tempo, Loki, Grafana)
@@ -56,6 +87,7 @@ kubectl apply -f k8s-createclustermetadata-job.yaml
 # Install cert-manager for certificate management
 echo "Installing cert-manager..."
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.0/cert-manager.yaml
+wait_for_resource deployment "cert-manager" cert-manager
 kubectl wait --for=condition=Available --timeout=300s \
   -n cert-manager deployment/cert-manager \
   deployment/cert-manager-webhook \
@@ -86,11 +118,15 @@ kubectl wait --for=condition=ready certificate/multigres-ca --timeout=120s
 kubectl wait --for=condition=ready certificate/pgbackrest-cert --timeout=120s
 
 # Make sure the cluster metadata job is complete before proceeding
+wait_for_resource job "createclustermetadata"
 kubectl wait --for=condition=complete job/createclustermetadata --timeout=120s
 
 # Deploy multiadmin services
 kubectl apply -f k8s-multiadmin.yaml
 kubectl apply -f k8s-multiadmin-web.yaml
+wait_for_resource pod "-l app=multiadmin"
+wait_for_resource pod "-l app=multiadmin-web"
+wait_for_resource pod "-l app=observability"
 kubectl wait --for=condition=ready pod -l app=multiadmin --timeout=120s
 kubectl wait --for=condition=ready pod -l app=multiadmin-web --timeout=120s
 kubectl wait --for=condition=ready pod -l app=observability --timeout=120s

@@ -24,6 +24,36 @@ if [[ $(basename "$PWD") != "kind_demo" ]]; then
   exit 1
 fi
 
+# Helper function to wait for resources to exist before waiting for their condition
+wait_for_resource() {
+  local resource_type=$1
+  local selector=$2
+  local namespace=${3:-default}
+  local max_attempts=24
+  local attempt=1
+
+  echo "Waiting for $resource_type ($selector) to be created..."
+  while [ $attempt -le $max_attempts ]; do
+    if [ "$namespace" = "default" ]; then
+      if kubectl get "$resource_type" $selector 2>/dev/null | tail -n +2 | grep -q .; then
+        echo "Resources created, waiting for ready state..."
+        return 0
+      fi
+    else
+      if kubectl get "$resource_type" -n "$namespace" $selector 2>/dev/null | tail -n +2 | grep -q .; then
+        echo "Resources created, waiting for ready state..."
+        return 0
+      fi
+    fi
+    if [ $attempt -eq $max_attempts ]; then
+      echo "Timeout: $resource_type not created after $max_attempts attempts"
+      return 1
+    fi
+    sleep 5
+    attempt=$((attempt + 1))
+  done
+}
+
 # Deploy core multigres components
 # Once the multipoolers come up, multiorch will bootstrap the cluster
 # and elect a primary.
@@ -31,6 +61,9 @@ kubectl apply -f k8s-multipooler-statefulset.yaml
 kubectl apply -f k8s-multiorch.yaml
 kubectl apply -f k8s-multigateway.yaml
 
+wait_for_resource pod "-l app=multipooler"
+wait_for_resource pod "-l app=multiorch"
+wait_for_resource pod "-l app=multigateway"
 kubectl wait --for=condition=ready pod -l app=multipooler --timeout=180s
 kubectl wait --for=condition=ready pod -l app=multiorch --timeout=120s
 kubectl wait --for=condition=ready pod -l app=multigateway --timeout=120s
