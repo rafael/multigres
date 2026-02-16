@@ -472,6 +472,11 @@ func shardWatchTargetsToStrings(targets []config.WatchTarget) []string {
 	return result
 }
 
+// GetActiveGracePeriods returns all non-expired grace period deadlines.
+func (re *Engine) GetActiveGracePeriods() []ActiveDeadline {
+	return re.recoveryGracePeriodTracker.GetActiveDeadlines()
+}
+
 // collectDetectedProblemsData returns the current detected problems for metrics.
 // This is called by the observable gauge callback.
 func (re *Engine) collectDetectedProblemsData() []DetectedProblemData {
