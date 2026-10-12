@@ -51,12 +51,13 @@ func transportAttr(v string) metric.MeasurementOption {
 }
 
 var (
-	attrNew               = transportAttr("new")
-	attrReused            = transportAttr("reused")
-	attrLegacyUnsupported = transportAttr("legacy_unsupported") // peer lacks ExecuteStream
-	attrLegacyMetadata    = transportAttr("legacy_metadata")    // call carries custom RPC metadata
-	attrLegacyPropagation = transportAttr("legacy_propagation") // nonstandard propagation fields
-	discardAttr           = map[string]metric.MeasurementOption{}
+	attrNew                        = transportAttr("new")
+	attrReused                     = transportAttr("reused")
+	attrLegacyRPCUnsupported       = transportAttr("legacy_rpc_unsupported")       // peer lacks ExecuteStream
+	attrLegacyOperationUnsupported = transportAttr("legacy_operation_unsupported") // peer lacks the requested operation
+	attrLegacyMetadata             = transportAttr("legacy_metadata")              // call carries custom RPC metadata
+	attrLegacyPropagation          = transportAttr("legacy_propagation")           // nonstandard propagation fields
+	discardAttr                    = map[string]metric.MeasurementOption{}
 )
 
 func init() {
@@ -75,7 +76,7 @@ func newStreamPoolMetrics(meter metric.Meter) *streamPoolMetrics {
 		slog.Warn("query stream metric unavailable", "metric", name, "error", err)
 	}
 	if c, err := meter.Int64Counter("mg.gateway.query_stream.operations",
-		metric.WithDescription("Simple-query operations by transport: a new reusable stream, a reused one, or the legacy per-call StreamExecute RPC (legacy_* says why)"),
+		metric.WithDescription("Query-service operations by transport: a new reusable stream, a reused one, or a dedicated per-call RPC (legacy_* says why)"),
 		metric.WithUnit("{operation}")); err != nil {
 		warn("mg.gateway.query_stream.operations", err)
 	} else {
