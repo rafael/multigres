@@ -99,6 +99,9 @@ func Serve(stream pb.MultipoolerService_ExecuteStreamServer, service Service) er
 			cancel()
 		}
 		span.End()
+		if adapter.recvErr != nil {
+			return adapter.recvErr
+		}
 		if adapter.sendErr != nil {
 			return adapter.sendErr
 		}
@@ -108,8 +111,16 @@ func Serve(stream pb.MultipoolerService_ExecuteStreamServer, service Service) er
 		if completion == nil {
 			completion = &statuspb.Status{Code: int32(codes.OK)}
 		}
-		if err := stream.Send(&pb.ExecuteStreamResponse{Completion: completion}); err != nil {
+		if err := stream.Send(&pb.ExecuteStreamResponse{Completion: completion, Retire: adapter.retire}); err != nil {
 			return err
+		}
+		if adapter.retire {
+			return nil
+		}
+		if adapter.afterCompletion != nil {
+			if err := adapter.afterCompletion(); err != nil {
+				return err
+			}
 		}
 	}
 }
