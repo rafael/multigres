@@ -77,7 +77,6 @@ runs:
     - name: Upload to Trunk
       uses: trunk-io/analytics-uploader@a86313c7029d22e6ea2d5c346060a224d90053dc # v2.1.6
       with:
-        cli-version: 0.16.0
         junit-paths: ${{ steps.prepare.outputs.junit-paths }}
         org-slug: ${{ inputs.org-slug }}
         test-collection-id: ${{ inputs.test-collection-id }}
