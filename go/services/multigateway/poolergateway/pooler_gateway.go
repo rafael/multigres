@@ -155,7 +155,8 @@ type PoolerGatewayOpts struct {
 	LocalPooler *LocalPooler
 }
 
-// LocalPooler is the pooler running in the same process as the gateway.
+// LocalPooler is the pooler running in the same process as the gateway: the
+// only pooler of its database, with the gateway as the only one in front of it.
 type LocalPooler struct {
 	// ID returns the pooler's topology ID. It is read when poolers are
 	// discovered, after flags are parsed.
@@ -163,6 +164,11 @@ type LocalPooler struct {
 	// DialOptions connect to the pooler's query service in the same process,
 	// replacing the topology address and DialOpt.
 	DialOptions []grpc.DialOption
+	// Record, when set, returns the pooler's record, read when the gateway
+	// starts. The gateway then learns of its pooler from it instead of the
+	// topology: the fields it uses (ID, shard) never change, and role and
+	// serving status come from the health stream. Optional.
+	Record func() *clustermetadatapb.Multipooler
 }
 
 // isLocal reports whether pooler is the local pooler.
@@ -174,13 +180,22 @@ func (l *LocalPooler) isLocal(pooler *clustermetadatapb.Multipooler) bool {
 // NewPoolerGateway constructs a PoolerGateway along with its underlying
 // pooler cache and load balancer.
 func NewPoolerGateway(opts PoolerGatewayOpts) *PoolerGateway {
+	// The gateway finds poolers in the topology, unless it is given its local
+	// pooler's record: then it uses that pooler and does not watch the topology.
 	var filter func(*clustermetadatapb.Multipooler) bool
+	source := opts.Source
+	var poolers []*clustermetadatapb.Multipooler
 	if opts.LocalPooler != nil {
 		filter = opts.LocalPooler.isLocal
+		if opts.LocalPooler.Record != nil {
+			source = nil
+			poolers = []*clustermetadatapb.Multipooler{opts.LocalPooler.Record()}
+		}
 	}
 	cache := poolerwatch.New(opts.Ctx, poolerwatch.Config[*poolerConnection]{
-		Source: opts.Source,
-		Filter: filter,
+		Source:  source,
+		Poolers: poolers,
+		Filter:  filter,
 		// LastReachedTimestamp is a no-op under the gateway's current
 		// zero-grace config — entries are evicted at the NoNode moment —
 		// but wiring it now means raising the grace to a non-zero value

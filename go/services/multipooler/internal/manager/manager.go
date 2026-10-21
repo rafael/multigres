@@ -1086,8 +1086,24 @@ func (pm *MultipoolerManager) loadShardConfigFromGlobalTopo() {
 		ctx, cancel := context.WithTimeout(pm.ctx, 5*time.Second)
 		db, err := pm.topoClient.GetDatabase(ctx, database)
 		cancel()
-		if err != nil {
+		fromTopo := err == nil
+		if errors.Is(err, &topoclient.TopoError{Code: topoclient.NoNode}) {
+			// The topology answered that the database does not exist (for
+			// example, it was deleted): never serve it from a copy.
 			continue // Will retry with backoff
+		}
+		if !fromTopo {
+			// The topology is unreachable: a static leader starts from its
+			// copy of the record instead.
+			cached, cacheErr := pm.loadDatabaseCache()
+			if cacheErr != nil {
+				pm.logger.Warn("cannot use the copy of the database record", "error", cacheErr)
+			}
+			if cached == nil {
+				continue // Will retry with backoff
+			}
+			pm.logger.Warn("database record unavailable from topology; using the copy kept by this static leader", "database", database, "error", err)
+			db = cached
 		}
 
 		// Validate and parse backup configuration
@@ -1178,6 +1194,10 @@ func (pm *MultipoolerManager) loadShardConfigFromGlobalTopo() {
 		if err != nil {
 			pm.setStateError(err)
 			return
+		}
+
+		if fromTopo {
+			pm.saveDatabaseCache(db)
 		}
 
 		pm.mu.Lock()
@@ -1916,4 +1936,10 @@ func (pm *MultipoolerManager) WaitUntilReady(ctx context.Context) error {
 			return fmt.Errorf("unexpected state after ready signal: %s", state)
 		}
 	}
+}
+
+// PoolerRecord returns a copy of the pooler's topology record, without the
+// topology.
+func (pm *MultipoolerManager) PoolerRecord() *clustermetadatapb.Multipooler {
+	return pm.record.Snapshot()
 }
