@@ -46,13 +46,20 @@ jobs:
       - name: Run race detection tests
         id: tests
         continue-on-error: true
-        run: .github/scripts/run-go-tests.sh race-test-results ./... -short -race -timeout=20m
+        run: |
+          gotestsum \
+            --format=testname \
+            --packages="./..." \
+            --jsonfile=race-test-results.jsonl \
+            --junitfile=race-test-results.xml \
+            -- \
+            -short -race -timeout=20m
 
       - name: Upload results and apply Trunk quarantine
         if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
         uses: ./.github/actions/upload-test-results
         with:
-          results-prefix: race-test-results
+          junit-paths: race-test-results.xml
           previous-step-outcome: ${{ steps.tests.outcome }}
           allow-quarantine: "true"
           # Track race failures independently of ordinary test results.
@@ -66,7 +73,6 @@ jobs:
           path: |
             race-test-results.jsonl
             race-test-results.xml
-            race-test-results.exitcode
           retention-days: 14
 
       - name: Test Report

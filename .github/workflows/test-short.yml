@@ -46,19 +46,23 @@ jobs:
       - name: Install gotestsum
         run: go install gotest.tools/gotestsum@v1.13.0
 
-      - name: Check quarantine safeguards
-        run: python3 .github/actions/upload-test-results/test-check-results.py
-
       - name: Run short tests
         id: tests
         continue-on-error: true
-        run: .github/scripts/run-go-tests.sh short-test-results ./... -short -timeout=20m
+        run: |
+          gotestsum \
+            --format=testname \
+            --packages="./..." \
+            --jsonfile=short-test-results.jsonl \
+            --junitfile=short-test-results.xml \
+            -- \
+            -short -timeout=20m
 
       - name: Upload results and apply Trunk quarantine
         if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
         uses: ./.github/actions/upload-test-results
         with:
-          results-prefix: short-test-results
+          junit-paths: short-test-results.xml
           previous-step-outcome: ${{ steps.tests.outcome }}
           allow-quarantine: "true"
 
@@ -70,7 +74,6 @@ jobs:
           path: |
             short-test-results.jsonl
             short-test-results.xml
-            short-test-results.exitcode
           retention-days: 14
 
       - name: Test Report

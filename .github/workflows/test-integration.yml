@@ -114,14 +114,14 @@ jobs:
           SKIP_PACKAGES: ${{ matrix.skip_packages }}
           SHARD: ${{ matrix.shard }}
         run: |
-          rm -f integration-test-results.{jsonl,xml,exitcode}
+          rm -f integration-test-results.{jsonl,xml}
           .github/scripts/run-integration-slice.sh
 
       - name: Upload results and apply Trunk quarantine
         if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
         uses: ./.github/actions/upload-test-results
         with:
-          results-prefix: integration-test-results
+          junit-paths: integration-test-results.xml
           previous-step-outcome: ${{ steps.tests.outcome }}
           allow-quarantine: "true"
 
@@ -141,7 +141,6 @@ jobs:
           path: |
             integration-test-results.jsonl
             integration-test-results.xml
-            integration-test-results.exitcode
           retention-days: 14
 
       - name: Test Report

@@ -22,13 +22,6 @@ description: >-
   not supplied.
 
 inputs:
-  results-prefix:
-    description: >-
-      Prefix written by run-go-tests.sh. Required when allowing quarantine, so
-      build errors, crashes, and incomplete runs fail independently of Trunk.
-      Takes precedence over junit-paths and json-file.
-    required: false
-    default: ""
   junit-paths:
     description: >-
       Comma-separated list of glob paths to existing JUnit XML files (forwarded
@@ -80,8 +73,6 @@ runs:
       id: prepare
       shell: bash
       env:
-        RESULTS_PREFIX: ${{ inputs.results-prefix }}
-        ALLOW_QUARANTINE: ${{ inputs.allow-quarantine }}
         JUNIT_PATHS: ${{ inputs.junit-paths }}
         JSON_FILE: ${{ inputs.json-file }}
         PREV_OUTCOME: ${{ inputs.previous-step-outcome }}

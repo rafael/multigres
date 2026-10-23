@@ -34,5 +34,10 @@ if [ -n "$run_regex" ]; then
   run_args=(-run "$run_regex")
 fi
 
-.github/scripts/run-go-tests.sh integration-test-results "${packages[*]}" \
+gotestsum \
+  --format=testname \
+  --packages="${packages[*]}" \
+  --jsonfile=integration-test-results.jsonl \
+  --junitfile=integration-test-results.xml \
+  -- \
   ${run_args[@]+"${run_args[@]}"} -skip TestPostgreSQLRegression -timeout=30m

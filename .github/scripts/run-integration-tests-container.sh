@@ -34,5 +34,9 @@ PORT_POOL_PID=$!
 trap 'kill $PORT_POOL_PID 2>/dev/null || true' EXIT
 
 MULTIGRES_PORT_POOL_ADDR=/tmp/multigres-port-pool.sock \
-  .github/scripts/run-go-tests.sh integration-test-results "./go/test/endtoend/..." \
-  -skip TestPostgreSQLRegression -timeout=30m
+  gotestsum \
+  --format=testname \
+  --packages="./go/test/endtoend/..." \
+  --jsonfile=integration-test-results.jsonl \
+  --junitfile=integration-test-results.xml \
+  -- -skip TestPostgreSQLRegression -timeout=30m
