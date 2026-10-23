@@ -22,6 +22,13 @@ description: >-
   not supplied.
 
 inputs:
+  results-prefix:
+    description: >-
+      Prefix written by run-go-tests.sh. Required when allowing quarantine, so
+      build errors, crashes, and incomplete runs fail independently of Trunk.
+      Takes precedence over junit-paths and json-file.
+    required: false
+    default: ""
   junit-paths:
     description: >-
       Comma-separated list of glob paths to existing JUnit XML files (forwarded
@@ -51,6 +58,10 @@ inputs:
       quarantine decision itself is Trunk's; this only permits it.
     required: false
     default: "false"
+  variant:
+    description: Optional test environment to track independently in Trunk.
+    required: false
+    default: ""
   org-slug:
     description: Trunk organization slug. Non-secret; safe to commit.
     required: false
@@ -69,6 +80,8 @@ runs:
       id: prepare
       shell: bash
       env:
+        RESULTS_PREFIX: ${{ inputs.results-prefix }}
+        ALLOW_QUARANTINE: ${{ inputs.allow-quarantine }}
         JUNIT_PATHS: ${{ inputs.junit-paths }}
         JSON_FILE: ${{ inputs.json-file }}
         PREV_OUTCOME: ${{ inputs.previous-step-outcome }}
@@ -77,9 +90,11 @@ runs:
     - name: Upload to Trunk
       uses: trunk-io/analytics-uploader@a86313c7029d22e6ea2d5c346060a224d90053dc # v2.1.6
       with:
+        cli-version: "0.16.1"
         junit-paths: ${{ steps.prepare.outputs.junit-paths }}
         org-slug: ${{ inputs.org-slug }}
         test-collection-id: ${{ inputs.test-collection-id }}
         allow-forked-pr-uploads: "true"
         quarantine: ${{ inputs.allow-quarantine }}
+        variant: ${{ inputs.variant }}
         previous-step-outcome: ${{ steps.prepare.outputs.previous-step-outcome }}

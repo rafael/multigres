@@ -20,6 +20,8 @@
 # Trunk" step) and runnable locally for debugging the conversion.
 #
 # Inputs (environment variables, mirroring the action's inputs):
+#   RESULTS_PREFIX Prefix written by run-go-tests.sh; overrides other paths.
+#   ALLOW_QUARANTINE Requires complete results before permitting quarantine.
 #   JUNIT_PATHS   Comma-separated globs/paths to existing JUnit XML files.
 #                 Takes precedence over JSON_FILE.
 #   JSON_FILE     Path to a single `go test -json` JSONL file. Converted to
@@ -40,6 +42,16 @@ set -euo pipefail
 JUNIT_PATHS="${JUNIT_PATHS:-}"
 JSON_FILE="${JSON_FILE:-}"
 PREV_OUTCOME="${PREV_OUTCOME:-}"
+RESULTS_PREFIX="${RESULTS_PREFIX:-}"
+
+if [[ "${ALLOW_QUARANTINE:-false}" == true ]]; then
+  : "${RESULTS_PREFIX:?quarantine requires results-prefix from run-go-tests.sh}"
+  python3 "$(dirname -- "$0")/check-results.py" "$RESULTS_PREFIX" \
+    --outcome "${PREV_OUTCOME:-failure}"
+fi
+if [[ -n "$RESULTS_PREFIX" ]]; then
+  JUNIT_PATHS="$RESULTS_PREFIX.xml"
+fi
 
 # set_output NAME VALUE — append to $GITHUB_OUTPUT in CI; print to stderr when
 # run locally so the resolved values are still visible.

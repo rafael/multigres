@@ -64,23 +64,22 @@ jobs:
           chmod 1777 "${GITHUB_WORKSPACE}"
 
       - name: Run integration tests
-        id: integration-tests
-        # continue-on-error lets the Trunk upload step below gate the job
-        # instead: it passes when every failure is quarantined, fails otherwise.
+        id: tests
         continue-on-error: true
         env:
           TEST_PRINT_LOGS: "1"
           AWS_ACCESS_KEY_ID: test-access-key
           AWS_SECRET_ACCESS_KEY: test-secret-key
-          RERUN_FAILS: "3"
-        run: .github/scripts/run-integration-tests-supabase.sh
+        run: |
+          rm -f integration-test-results.{jsonl,xml,exitcode}
+          .github/scripts/run-integration-tests-supabase.sh
 
-      - name: Upload test results to Trunk
-        if: ${{ !cancelled() }}
+      - name: Upload results and apply Trunk quarantine
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
         uses: ./.github/actions/upload-test-results
         with:
-          junit-paths: integration-test-results.xml
-          previous-step-outcome: ${{ steps.integration-tests.outcome }}
+          results-prefix: integration-test-results
+          previous-step-outcome: ${{ steps.tests.outcome }}
           allow-quarantine: "true"
 
       - name: Upload test logs
@@ -91,6 +90,7 @@ jobs:
           path: |
             integration-test-results.jsonl
             integration-test-results.xml
+            integration-test-results.exitcode
           retention-days: 14
 
       - name: Test Report
@@ -100,6 +100,7 @@ jobs:
           name: Integration Tests (Supabase Postgres)
           path: integration-test-results.jsonl
           reporter: golang-json
+          fail-on-error: "false" # Trunk owns the test failure decision.
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() && github.event_name == 'push' }}
