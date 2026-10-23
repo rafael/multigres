@@ -38,16 +38,16 @@ if [ "${RETRY_FAILED_TESTS:-false}" = true ]; then
   done
   initial_exit=$(cat "$prefix.exitcode")
   case "$initial_exit" in
-    ''|*[!0-9]*)
-      echo "Cannot retry: invalid initial exit code $initial_exit" >&2
-      exit 1
-      ;;
-    0) exit 0 ;;
-    1) ;;
-    *)
-      echo "Cannot retry: initial exit code was $initial_exit" >&2
-      exit "$initial_exit"
-      ;;
+  '' | *[!0-9]*)
+    echo "Cannot retry: invalid initial exit code $initial_exit" >&2
+    exit 1
+    ;;
+  0) exit 0 ;;
+  1) ;;
+  *)
+    echo "Cannot retry: initial exit code was $initial_exit" >&2
+    exit "$initial_exit"
+    ;;
   esac
 
   # A failed command with no failed test events is an infrastructure/build

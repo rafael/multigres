@@ -41,20 +41,20 @@ while [ "$flag_count" -gt 0 ]; do
   shift
   flag_count=$((flag_count - 1))
   case "$flag" in
-    -run|--run|-test.run|--test.run)
-      if [ "$flag_count" -eq 0 ]; then
-        echo "Missing value for $flag" >&2
-        exit 2
-      fi
-      shift
-      flag_count=$((flag_count - 1))
-      ;;
-    -run=*|--run=*|-test.run=*|--test.run=*) ;;
-    -args|--args)
-      echo "run-go-tests.sh requires Go test flags without -args" >&2
+  -run | --run | -test.run | --test.run)
+    if [ "$flag_count" -eq 0 ]; then
+      echo "Missing value for $flag" >&2
       exit 2
-      ;;
-    *) set -- "$@" "$flag" ;;
+    fi
+    shift
+    flag_count=$((flag_count - 1))
+    ;;
+  -run=* | --run=* | -test.run=* | --test.run=*) ;;
+  -args | --args)
+    echo "run-go-tests.sh requires Go test flags without -args" >&2
+    exit 2
+    ;;
+  *) set -- "$@" "$flag" ;;
   esac
 done
 run_filter=$1

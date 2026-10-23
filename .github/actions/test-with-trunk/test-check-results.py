@@ -30,6 +30,8 @@ from pathlib import Path
 SPEC = importlib.util.spec_from_file_location(
     "check_results", Path(__file__).with_name("check-results.py")
 )
+if SPEC is None or SPEC.loader is None:
+    raise ImportError("Cannot load check-results.py")
 CHECKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECKER)
 

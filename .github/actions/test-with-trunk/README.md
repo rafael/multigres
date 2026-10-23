@@ -3,14 +3,14 @@
 Short, race, and integration jobs use this action to make Trunk the source of
 quarantine decisions while preserving gotestsum's existing retry policy.
 
-| Initial result | Behavior |
-| --- | --- |
-| All tests pass | Upload and pass. |
-| All failures are already quarantined | Skip retries, upload, and apply Trunk's decision. |
-| Any failure is not quarantined | Retry failed tests up to three times, with the existing ten-failure limit. |
-| All retried tests pass | Pass and upload both the original failures and the passing retries. |
-| Failures persist | Upload all attempts and let Trunk apply quarantine. |
-| Build error, crash, or incomplete results | Fail independently of quarantine. |
+| Initial result                            | Behavior                                                                   |
+| ----------------------------------------- | -------------------------------------------------------------------------- |
+| All tests pass                            | Upload and pass.                                                           |
+| All failures are already quarantined      | Skip retries, upload, and apply Trunk's decision.                          |
+| Any failure is not quarantined            | Retry failed tests up to three times, with the existing ten-failure limit. |
+| All retried tests pass                    | Pass and upload both the original failures and the passing retries.        |
+| Failures persist                          | Upload all attempts and let Trunk apply quarantine.                        |
+| Build error, crash, or incomplete results | Fail independently of quarantine.                                          |
 
 The quarantine probe uses the uploader's `dry-run` option. CLI version 0.16.1
 still checks existing quarantine in this mode but does not upload the initial
