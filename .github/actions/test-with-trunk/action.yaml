@@ -1,0 +1,106 @@
+# Copyright 2026 Supabase, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Run tests with Trunk quarantine and fallback retries
+description: >-
+  Runs tests once, consults Trunk, and retries failures only when Trunk does not
+  accept them as quarantined. The command must use run-go-tests.sh so retry mode
+  resumes the first attempt instead of rerunning the full suite. All attempts
+  are uploaded together, and Trunk determines the final test result.
+
+inputs:
+  command:
+    description: Shell command that invokes run-go-tests.sh, directly or via a wrapper.
+    required: true
+  results-prefix:
+    description: Prefix of the JSONL and JUnit files written by run-go-tests.sh.
+    required: true
+  variant:
+    description: Optional test environment to track independently in Trunk.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Run tests once
+      id: tests
+      continue-on-error: true
+      shell: bash
+      env:
+        TEST_COMMAND: ${{ inputs.command }}
+        RESULTS_PREFIX: ${{ inputs.results-prefix }}
+        RETRY_FAILED_TESTS: "false"
+      run: |
+        # Clear reports before the wrapper too: it can fail during setup before
+        # reaching run-go-tests.sh (for example, building the container binary).
+        rm -f "$RESULTS_PREFIX".{jsonl,xml,trunk.xml,exitcode,stderr} \
+          "$RESULTS_PREFIX".initial.{jsonl,xml,exitcode,stderr}
+        bash --noprofile --norc -eo pipefail -c "$TEST_COMMAND"
+
+    - name: Validate initial test execution
+      id: initial-integrity
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        RESULTS_PREFIX: ${{ inputs.results-prefix }}
+        TEST_OUTCOME: ${{ steps.tests.outcome }}
+      run: python3 "$GITHUB_ACTION_PATH/check-results.py" "$RESULTS_PREFIX" --outcome "$TEST_OUTCOME"
+
+    - name: Check existing quarantine before retrying
+      id: quarantine
+      if: ${{ !cancelled() && steps.tests.outcome == 'failure' && steps.initial-integrity.outcome == 'success' }}
+      continue-on-error: true
+      uses: ./.github/actions/upload-test-results
+      with:
+        junit-paths: ${{ inputs.results-prefix }}.trunk.xml
+        previous-step-outcome: ${{ steps.tests.outcome }}
+        allow-quarantine: "true"
+        dry-run: "true"
+        variant: ${{ inputs.variant }}
+
+    # If any failure is not quarantined (or Trunk cannot be reached), keep
+    # gotestsum's existing retry policy. In a mixed run it retries known flakes
+    # too; a boolean job-level quarantine decision cannot filter individual tests.
+    - name: Retry failed tests
+      id: retries
+      if: ${{ !cancelled() && steps.initial-integrity.outcome == 'success' && steps.quarantine.outcome == 'failure' }}
+      continue-on-error: true
+      shell: bash
+      env:
+        TEST_COMMAND: ${{ inputs.command }}
+        RETRY_FAILED_TESTS: "true"
+      run: bash --noprofile --norc -eo pipefail -c "$TEST_COMMAND"
+
+    - name: Validate retry execution
+      id: retry-integrity
+      if: ${{ !cancelled() && steps.retries.outcome != 'skipped' }}
+      shell: bash
+      env:
+        RESULTS_PREFIX: ${{ inputs.results-prefix }}
+        TEST_OUTCOME: ${{ steps.retries.outcome }}
+      run: python3 "$GITHUB_ACTION_PATH/check-results.py" "$RESULTS_PREFIX" --retry --outcome "$TEST_OUTCOME"
+
+    - name: Upload results and apply quarantine
+      if: >-
+        ${{ !cancelled() && steps.initial-integrity.outcome == 'success' &&
+            (steps.retries.outcome == 'skipped' || steps.retry-integrity.outcome == 'success') }}
+      uses: ./.github/actions/upload-test-results
+      with:
+        junit-paths: ${{ inputs.results-prefix }}.trunk.xml
+        # Passing retries must supply success even though JUnit retains earlier
+        # failures. If no retry ran, preserve the initial test outcome.
+        previous-step-outcome: ${{ steps.retries.outcome != 'skipped' && steps.retries.outcome || steps.tests.outcome }}
+        allow-quarantine: "true"
+        variant: ${{ inputs.variant }}

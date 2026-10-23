@@ -46,29 +46,16 @@ jobs:
       - name: Install gotestsum
         run: go install gotest.tools/gotestsum@v1.13.0
 
-      - name: Run short tests
-        id: short-tests
-        # continue-on-error lets the Trunk upload step below gate the job
-        # instead: it passes when every failure is quarantined, fails otherwise.
-        continue-on-error: true
+      - name: Check test runner behavior
         run: |
-          gotestsum \
-            --format=testname \
-            --rerun-fails=3 \
-            --rerun-fails-max-failures=10 \
-            --packages="./..." \
-            --jsonfile=short-test-results.jsonl \
-            --junitfile=short-test-results.xml \
-            -- \
-            -short -timeout=20m
+          python3 .github/actions/test-with-trunk/test-check-results.py
+          python3 .github/scripts/test-run-go-tests.py
 
-      - name: Upload test results to Trunk
-        if: ${{ !cancelled() }}
-        uses: ./.github/actions/upload-test-results
+      - name: Run short tests
+        uses: ./.github/actions/test-with-trunk
         with:
-          junit-paths: short-test-results.xml
-          previous-step-outcome: ${{ steps.short-tests.outcome }}
-          allow-quarantine: "true"
+          command: .github/scripts/run-go-tests.sh short-test-results ./... -short -timeout=20m
+          results-prefix: short-test-results
 
       - name: Upload test logs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -78,6 +65,7 @@ jobs:
           path: |
             short-test-results.jsonl
             short-test-results.xml
+            short-test-results.trunk.xml
           retention-days: 14
 
       - name: Test Report
@@ -87,6 +75,7 @@ jobs:
           name: Unit Tests
           path: short-test-results.jsonl
           reporter: golang-json
+          fail-on-error: "false" # Trunk owns the test failure decision.
 
       # Only upload test results from main-branch pushes. On PRs, Codecov's
       # test-results comment template replaces the coverage comment when any

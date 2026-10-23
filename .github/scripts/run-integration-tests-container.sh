@@ -25,8 +25,7 @@
 #   TEST_PRINT_LOGS       Set non-empty to print service logs on test failure.
 #   AWS_ACCESS_KEY_ID     Forwarded to tests (default set by outer script).
 #   AWS_SECRET_ACCESS_KEY Forwarded to tests (default set by outer script).
-#   RERUN_FAILS           gotestsum --rerun-fails count; empty = no reruns.
-#                         Set to 3 in CI for flake tolerance.
+#   RETRY_FAILED_TESTS    Set to true to retry the saved initial test failures.
 set -eu
 
 make build
@@ -35,19 +34,6 @@ make build
 PORT_POOL_PID=$!
 trap 'kill $PORT_POOL_PID 2>/dev/null || true' EXIT
 
-rerun_flags=""
-if [ -n "${RERUN_FAILS:-}" ]; then
-  rerun_flags="--rerun-fails=${RERUN_FAILS} --rerun-fails-max-failures=10"
-fi
-
-# SC2086: rerun_flags is intentionally unquoted so it word-splits into
-# separate flags when non-empty and produces no argument when empty.
-# shellcheck disable=SC2086
 MULTIGRES_PORT_POOL_ADDR=/tmp/multigres-port-pool.sock \
-  gotestsum \
-  --format=testname \
-  ${rerun_flags} \
-  --packages="./go/test/endtoend/..." \
-  --jsonfile=integration-test-results.jsonl \
-  --junitfile=integration-test-results.xml \
-  -- -skip TestPostgreSQLRegression -timeout=30m
+  .github/scripts/run-go-tests.sh integration-test-results "./go/test/endtoend/..." \
+  -skip TestPostgreSQLRegression -timeout=30m

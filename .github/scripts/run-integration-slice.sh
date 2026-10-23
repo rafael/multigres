@@ -34,12 +34,5 @@ if [ -n "$run_regex" ]; then
   run_args=(-run "$run_regex")
 fi
 
-gotestsum \
-  --format=testname \
-  --rerun-fails=3 \
-  --rerun-fails-max-failures=10 \
-  --packages="${packages[*]}" \
-  --jsonfile=integration-test-results.jsonl \
-  --junitfile=integration-test-results.xml \
-  -- \
+.github/scripts/run-go-tests.sh integration-test-results "${packages[*]}" \
   ${run_args[@]+"${run_args[@]}"} -skip TestPostgreSQLRegression -timeout=30m

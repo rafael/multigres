@@ -51,6 +51,16 @@ inputs:
       quarantine decision itself is Trunk's; this only permits it.
     required: false
     default: "false"
+  dry-run:
+    description: >-
+      Check quarantine without uploading results. Used before retries so the
+      initial attempt is only uploaded once, with the final combined report.
+    required: false
+    default: "false"
+  variant:
+    description: Optional test environment to track independently in Trunk.
+    required: false
+    default: ""
   org-slug:
     description: Trunk organization slug. Non-secret; safe to commit.
     required: false
@@ -77,9 +87,13 @@ runs:
     - name: Upload to Trunk
       uses: trunk-io/analytics-uploader@a86313c7029d22e6ea2d5c346060a224d90053dc # v2.1.6
       with:
+        # The retry decision depends on dry-run performing quarantine lookup.
+        cli-version: "0.16.1"
         junit-paths: ${{ steps.prepare.outputs.junit-paths }}
         org-slug: ${{ inputs.org-slug }}
         test-collection-id: ${{ inputs.test-collection-id }}
         allow-forked-pr-uploads: "true"
         quarantine: ${{ inputs.allow-quarantine }}
+        dry-run: ${{ inputs.dry-run }}
+        variant: ${{ inputs.variant }}
         previous-step-outcome: ${{ steps.prepare.outputs.previous-step-outcome }}
